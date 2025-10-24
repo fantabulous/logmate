@@ -1,1016 +1,970 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, query, where, updateDoc, setDoc, getDoc } from 'firebase/firestore';
-import { Home, Factory, CheckSquare, ChevronRight, User, Loader2, LogOut, TrendingUp, TrendingDown, Clock, XCircle, Settings, KeyRound } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogMate Enterprise Workflow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// --- Firebase Initialization and Auth Setup (Mandatory Boilerplate) ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-neterwala-poc-app';
+        // --- GLOBAL FIREBASE CONFIG ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-logmate-app';
 
-const useFirebase = () => {
-    const [db, setDb] = useState(null);
-    const [auth, setAuth] = useState(null);
-    const [userId, setUserId] = useState(null);
-    const [isAuthReady, setIsAuthReady] = useState(false);
-
-    useEffect(() => {
-        try {
-            const app = initializeApp(firebaseConfig);
-            const firestore = getFirestore(app);
-            const authentication = getAuth(app);
-
-            setDb(firestore);
-            setAuth(authentication);
-
-            const unsubscribe = onAuthStateChanged(authentication, async (user) => {
-                if (user) {
-                    setUserId(user.uid);
-                } else {
-                    // Sign in anonymously if no token is available
-                    if (initialAuthToken) {
-                        try {
-                            await signInWithCustomToken(authentication, initialAuthToken);
-                        } catch (error) {
-                            console.error("Error signing in with custom token:", error);
-                            await signInAnonymously(authentication);
-                        }
-                    } else {
-                        await signInAnonymously(authentication);
-                    }
+        let app, db, auth;
+        let userId = null;
+        let isAuthReady = false;
+        
+        // Expose functions globally for event listeners
+        window.handleLogout = async () => {
+             if (auth) {
+                try {
+                    await signOut(auth);
+                    // The onAuthStateChanged listener handles re-sign in
+                } catch (error) {
+                    console.error("Error signing out:", error);
                 }
-                setIsAuthReady(true);
+            }
+        };
+
+        window.initializeApp = async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                // getFirestore(app) // Required for firestore logging
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                    } else {
+                        if (initialAuthToken) {
+                            try {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } catch (error) {
+                                console.error("Error signing in with custom token:", error);
+                                await signInAnonymously(auth);
+                            }
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                    userId = auth.currentUser?.uid || 'anonymous-user';
+                    isAuthReady = true;
+                    // Initial render after auth is ready
+                    updateUI(); 
+                });
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                isAuthReady = true;
+                updateUI(); // Render even if init fails
+            }
+        };
+
+        // --- Mock Data Setup ---
+        window.appState = {
+            currentPage: 'dashboard',
+            currentWorkflow: 'production',
+            productionStep: 1,
+            qcStep: 1,
+            timePeriod: '30days',
+            isMenuOpen: false,
+            // Production State
+            materialCodeFilter: '',
+            selectedOrder: null,
+            updateQty: '',
+            yieldValue: '',
+            postingDate: new Date().toISOString().substring(0, 10),
+            acceptedQty: '',
+            rejectedQty: '',
+            
+            // QC State
+            qcDateFrom: new Date().toISOString().substring(0, 10),
+            qcDateTo: new Date().toISOString().substring(0, 10),
+            qcMaterialCodeFilter: '',
+            inspectionStatus: 'PENDING',
+            selectedInspection: null,
+            okQty: '',
+            notOkQty: '',
+            defectsCode: '',
+            usageDecision: 'U1',
+        };
+
+        window.mockData = {
+            orders: [
+                { id: 'ORD-1001', materialCode: 'MAT-A1', targetQty: 500, status: 'CREATED', batch: 'BCH-001' },
+                { id: 'ORD-1002', materialCode: 'MAT-B2', targetQty: 750, status: 'CREATED', batch: 'BCH-002' },
+                { id: 'ORD-1003', materialCode: 'MAT-C3', targetQty: 200, status: 'RELEASED', batch: 'BCH-003' },
+            ],
+            inspections: [
+                { id: 'INS-001', lotId: 'LOT-901', materialCode: 'MAT-A1', status: 'PENDING', inspectedQty: 500 },
+                { id: 'INS-002', lotId: 'LOT-902', materialCode: 'MAT-B2', status: 'PENDING', inspectedQty: 750 },
+                { id: 'INS-003', lotId: 'LOT-903', materialCode: 'MAT-C3', status: 'COMPLETED', inspectedQty: 200 },
+            ],
+            defectCodes: [
+                { value: 'D01', label: 'Scratch' },
+                { value: 'D02', label: 'Misalignment' },
+                { value: 'D03', label: 'Contamination' },
+            ],
+        };
+
+        window.getTrendData = (period) => {
+            switch (period) {
+                case '90days':
+                    return {
+                        yieldRate: [
+                            { label: 'Wk1', value: 97.2 }, { label: 'Wk2', value: 97.5 }, { label: 'Wk3', value: 98.1 }, 
+                            { label: 'Wk4', value: 97.9 }, { label: 'Wk5', value: 97.0 }, { label: 'Wk6', value: 97.8 },
+                        ],
+                        ordersCompleted: [
+                            { label: 'Wk1', value: 120 }, { label: 'Wk2', value: 135 }, { label: 'Wk3', value: 150 }, 
+                            { label: 'Wk4', value: 140 }, { label: 'Wk5', value: 110 }, { label: 'Wk6', value: 160 },
+                        ]
+                    };
+                case 'ytd':
+                    return {
+                        yieldRate: [
+                            { label: 'Jan', value: 96.5 }, { label: 'Feb', value: 97.0 }, { label: 'Mar', value: 97.5 }, 
+                            { label: 'Apr', value: 97.8 }, { label: 'May', value: 98.0 }, { label: 'Jun', value: 97.5 },
+                        ],
+                        ordersCompleted: [
+                            { label: 'Jan', value: 450 }, { label: 'Feb', value: 510 }, { label: 'Mar', value: 600 }, 
+                            { label: 'Apr', value: 550 }, { label: 'May', value: 630 }, { label: 'Jun', value: 700 },
+                        ]
+                    };
+                case '30days':
+                default:
+                    return {
+                        yieldRate: [
+                            { label: 'Day1', value: 97.5 }, { label: 'Day5', value: 97.9 }, { label: 'Day10', value: 97.7 }, 
+                            { label: 'Day15', value: 98.2 }, { label: 'Day20', value: 97.8 }, { label: 'Day30', value: 98.0 },
+                        ],
+                        ordersCompleted: [
+                            { label: 'Day1', value: 45 }, { label: 'Day5', value: 52 }, { label: 'Day10', value: 50 }, 
+                            { label: 'Day15', value: 60 }, { label: 'Day20', value: 55 }, { label: 'Day30', value: 65 },
+                        ]
+                    };
+            }
+        };
+
+        // --- State Management and UI Update ---
+        window.setState = (newState) => {
+            window.appState = { ...window.appState, ...newState };
+            updateUI();
+        };
+
+        window.updateUI = () => {
+            renderSidebar();
+            renderMainContent();
+        };
+
+        // --- Core Rendering Logic ---
+
+        // Lucide Icons (inlined as SVG strings)
+        const icons = {
+            Home: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-home"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+            Factory: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-factory"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h2"/><path d="M17 14h2"/><path d="M17 10h2"/><path d="M7 18h2"/><path d="M7 14h2"/></svg>`,
+            CheckSquare: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-square"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+            ChevronRight: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>`,
+            TrendingUp: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
+            TrendingDown: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-down"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>`,
+            Clock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+            XCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+            User: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+            KeyRound: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3"/><path d="M7 10h.01"/><path d="m10 10.3-6.6-6.6a2 2 0 0 1 0-2.8L5 .6a2 2 0 0 1 2.8 0l6.6 6.6"/><circle cx="19" cy="19" r="3"/><path d="m14 10-2 2"/></svg>`,
+            LogOut: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x1="12" y1="12" y2="12"/></svg>`
+        };
+        
+        const getIcon = (name, className = '') => `<span class="${className}">${icons[name] || ''}</span>`;
+
+        // --- Component Mappers (React to HTML/JS) ---
+
+        function renderCard(title, content, className = '') {
+            return `
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 ${className}">
+                    ${title ? `<h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">${title}</h2>` : ''}
+                    ${content}
+                </div>
+            `;
+        }
+
+        function renderButton({ text, onClick, disabled = false, variant = 'primary', className = '' }) {
+            let baseStyles = 'px-4 py-2 font-medium rounded-lg transition duration-150 shadow-md';
+            if (variant === 'primary') {
+                baseStyles += ' bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400';
+            } else if (variant === 'secondary') {
+                baseStyles += ' bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50 disabled:text-gray-400 disabled:border-gray-400';
+            } else if (variant === 'danger') {
+                baseStyles += ' bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400';
+            }
+
+            const disabledAttr = disabled ? 'disabled' : '';
+            const finalClass = `${baseStyles} ${className} ${disabled ? 'cursor-not-allowed opacity-75' : ''}`;
+
+            return `<button onclick="${onClick}" ${disabledAttr} class="${finalClass}">${text}</button>`;
+        }
+        
+        function renderInput({ id, label, type = 'text', value, onChange, placeholder = '', required = false, className = '' }) {
+            const requiredHtml = required ? '<span class="text-red-500">*</span>' : '';
+            return `
+                <div class="mb-4 ${className}">
+                    <label for="${id}" class="block text-sm font-medium text-gray-700 mb-1">${label} ${requiredHtml}</label>
+                    <input
+                        id="${id}"
+                        type="${type}"
+                        value="${value}"
+                        oninput="${onChange}"
+                        placeholder="${placeholder}"
+                        ${required ? 'required' : ''}
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                    />
+                </div>
+            `;
+        }
+
+        function renderSelect({ id, label, value, onChange, options, required = false, className = '' }) {
+            const requiredHtml = required ? '<span class="text-red-500">*</span>' : '';
+            const optionsHtml = options.map(option => 
+                `<option value="${option.value}" ${value === option.value ? 'selected' : ''}>${option.label}</option>`
+            ).join('');
+
+            return `
+                <div class="mb-4 ${className}">
+                    <label for="${id}" class="block text-sm font-medium text-gray-700 mb-1">${label} ${requiredHtml}</label>
+                    <select
+                        id="${id}"
+                        value="${value}"
+                        onchange="${onChange}"
+                        ${required ? 'required' : ''}
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 bg-white"
+                    >
+                        ${optionsHtml}
+                    </select>
+                </div>
+            `;
+        }
+
+        // --- Sidebar Renderer ---
+
+        function renderSidebar() {
+            const { currentPage, isMenuOpen } = window.appState;
+            const userName = auth?.currentUser?.displayName || 'Manufacturing Lead';
+            const userInitial = userName.charAt(0).toUpperCase();
+            
+            const navItems = [
+                { name: 'Dashboard', icon: 'Home', page: 'dashboard' },
+                { name: 'Assembly', icon: 'Factory', page: 'assembly' },
+                { name: 'Pattern', icon: 'CheckSquare', page: 'pattern' },
+            ];
+            
+            const navHtml = navItems.map(item => `
+                <button
+                    onclick="setState({ currentPage: '${item.page}', currentWorkflow: 'production' })"
+                    class="w-full flex items-center p-3 rounded-lg text-sm font-medium transition duration-150 ${
+                        currentPage === item.page
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    }"
+                >
+                    ${getIcon(item.icon, 'w-5 h-5 mr-3')}
+                    ${item.name}
+                </button>
+            `).join('');
+
+            const userMenuHtml = `
+                <div class="p-4 border-t border-gray-800 relative">
+                    <button 
+                        onclick="setState({ isMenuOpen: !appState.isMenuOpen })"
+                        class="w-full flex items-center space-x-3 p-2 -m-2 rounded-lg transition duration-150 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-50"
+                    >
+                        <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-lg font-bold text-white border-2 border-indigo-400 flex-shrink-0">
+                            ${userInitial}
+                        </div>
+                        <div class="text-left flex-grow truncate">
+                            <p class="text-sm font-semibold truncate text-white">${userName}</p>
+                            <p class="text-xs text-gray-400">View Profile</p>
+                        </div>
+                    </button>
+                    
+                    ${isMenuOpen ? `
+                        <div class="absolute bottom-full left-0 w-full mb-2 p-3 bg-gray-700 rounded-xl shadow-2xl z-10 origin-bottom animate-slideUp">
+                            <button onclick="alert('Profile View/Edit feature would open here.'); setState({ isMenuOpen: false });" class="w-full flex items-center p-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg transition duration-150">
+                                ${getIcon('User', 'w-4 h-4 mr-3')}
+                                View Profile
+                            </button>
+                            <button onclick="alert('Change Password functionality would be implemented here.'); setState({ isMenuOpen: false });" class="w-full flex items-center p-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg transition duration-150">
+                                ${getIcon('KeyRound', 'w-4 h-4 mr-3')}
+                                Change Password
+                            </button>
+                            <div class="my-2 border-t border-gray-600"></div>
+                            <button onclick="handleLogout()" class="w-full flex items-center p-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg transition duration-150">
+                                ${getIcon('LogOut', 'w-4 h-4 mr-3')}
+                                Log Out
+                            </button>
+                        </div>
+                    ` : ''}
+
+                    <div class="mt-4 pt-2 border-t border-gray-800">
+                        <p class="text-xs font-medium text-gray-400 mb-1">Authenticated User ID:</p>
+                        <p class="text-xs text-indigo-300 break-all">${userId || 'Loading...'}</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('sidebar').innerHTML = `
+                <div class="p-6">
+                    <h1 class="text-2xl font-extrabold tracking-tight text-indigo-400">LogMate</h1>
+                    <p class="text-xs text-gray-400 mt-1">Enterprise Workflow</p>
+                </div>
+                <nav class="flex-grow space-y-2 p-4">${navHtml}</nav>
+                ${userMenuHtml}
+            `;
+        }
+
+        // --- Dashboard Content ---
+        
+        function renderStatCard(title, value, unit, change, iconName, colorClass) {
+            const trendIcon = change > 0 ? getIcon('TrendingUp', 'w-4 h-4 text-green-500 mr-1') : 
+                              change < 0 ? getIcon('TrendingDown', 'w-4 h-4 text-red-500 mr-1') : '';
+            const trendColorClass = change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-gray-500';
+
+            const content = `
+                <div class="flex flex-col">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">${title}</h3>
+                        <div class="p-2 rounded-full ${colorClass} bg-opacity-10">
+                            ${getIcon(iconName, `w-5 h-5 ${colorClass}`)}
+                        </div>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">
+                        ${value} <span class="text-base font-normal text-gray-500">${unit}</span>
+                    </p>
+                    <div class="flex items-center mt-3 text-sm">
+                        ${trendIcon}
+                        <span class="${trendColorClass}">
+                            ${Math.abs(change)}% vs last month
+                        </span>
+                    </div>
+                </div>
+            `;
+            return renderCard(null, content);
+        }
+
+        function renderLineChart(data, title, color) {
+            const max = Math.max(...data.map(d => d.value));
+            const min = Math.min(...data.map(d => d.value));
+            const range = max - min === 0 ? 1 : max - min;
+            const padding = 10;
+            const width = 600;
+            const height = 200;
+            const pointRadius = 4;
+
+            const points = data.map((d, i) => {
+                const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
+                const y = height - padding - ((d.value - min) / range) * (height - 2 * padding);
+                return { x, y, value: d.value, label: d.label };
             });
 
-            return () => unsubscribe();
-        } catch (error) {
-            console.error("Firebase Initialization Error:", error);
-            setIsAuthReady(true);
-        }
-    }, []);
+            const linePath = points.map((point, i) => 
+                `${i === 0 ? 'M' : 'L'} ${point.x},${point.y}`
+            ).join(' ');
 
-    // Placeholder function for Firestore interaction (not used for core POC logic)
-    const saveUserData = useCallback(async (data) => {
-        if (db && userId) {
-            try {
-                const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'config', 'settings');
-                await setDoc(userDocRef, data, { merge: true });
-                console.log("User data saved successfully.");
-            } catch (e) {
-                console.error("Error adding document: ", e);
-            }
-        }
-    }, [db, userId]);
-
-    return { db, auth, userId, isAuthReady, saveUserData };
-};
-
-// --- Utility Components ---
-
-const Card = ({ title, children, className = '' }) => (
-    <div className={`bg-white p-6 rounded-xl shadow-lg border border-gray-100 ${className}`}>
-        {title && <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">{title}</h2>}
-        {children}
-    </div>
-);
-
-const StatCard = ({ title, value, unit, change, icon: Icon, colorClass }) => (
-    <Card className="flex flex-col">
-        <div className="flex justify-between items-start">
-            <h3 className="text-sm font-medium text-gray-500 uppercase">{title}</h3>
-            <div className={`p-2 rounded-full ${colorClass} bg-opacity-10`}>
-                <Icon className={`w-5 h-5 ${colorClass}`} />
-            </div>
-        </div>
-        <p className="text-3xl font-bold text-gray-900 mt-2">
-            {value} <span className="text-base font-normal text-gray-500">{unit}</span>
-        </p>
-        <div className="flex items-center mt-3 text-sm">
-            {change > 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            ) : change < 0 ? (
-                <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
-            ) : null}
-            <span className={change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-gray-500'}>
-                {Math.abs(change)}% vs last month
-            </span>
-        </div>
-    </Card>
-);
-
-// Simplified Bar Chart Component (using SVG)
-const SimpleBarChart = ({ data, title, color }) => {
-    const max = Math.max(...data.map(d => d.value));
-    const totalBars = data.length;
-
-    return (
-        <Card title={title}>
-            <svg viewBox={`0 0 ${totalBars * 60} 200`} className="w-full h-40">
-                {data.map((d, index) => (
-                    <g key={d.label} transform={`translate(${index * 60}, 0)`}>
-                        <rect
-                            x="10"
-                            y={200 - (d.value / max) * 150}
-                            width="40"
-                            height={(d.value / max) * 150}
-                            fill={color}
-                            className="transition-all duration-500 ease-out"
-                            rx="5"
-                        />
-                        <text x="30" y="195" textAnchor="middle" fontSize="12" fill="#6B7280">{d.label}</text>
-                        <text x="30" y={200 - (d.value / max) * 150 - 5} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#374151">{d.value}</text>
+            let svgContent = `
+                <svg viewBox="0 0 ${width} ${height}" class="w-full h-48">
+                    <text x="5" y="15" font-size="10" fill="#6B7280" text-anchor="start">${max}</text>
+                    <text x="5" y="${height - 5}" font-size="10" fill="#6B7280" text-anchor="start">${min}</text>
+                    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="3" vector-effect="non-scaling-stroke" />
+            `;
+            
+            points.forEach((point, i) => {
+                svgContent += `
+                    <g>
+                        <circle cx="${point.x}" cy="${point.y}" r="${pointRadius}" fill="${color}" stroke="white" stroke-width="2" />
+                        <text x="${point.x}" y="${height - 2}" text-anchor="middle" font-size="10" fill="#6B7280">${point.label}</text>
                     </g>
-                ))}
-            </svg>
-        </Card>
-    );
-};
+                `;
+            });
+            svgContent += `</svg>`;
+            return renderCard(title, svgContent);
+        }
 
-// Simplified Line Chart Component (using SVG)
-const SimpleLineChart = ({ data, title, color }) => {
-    const max = Math.max(...data.map(d => d.value));
-    const min = Math.min(...data.map(d => d.value));
-    const range = max - min === 0 ? 1 : max - min;
-    const padding = 10;
-    const width = 600;
-    const height = 200;
-    const pointRadius = 4;
+        function renderBarChart(data, title, color) {
+            const max = Math.max(...data.map(d => d.value));
+            const totalBars = data.length;
+            const viewBoxWidth = totalBars * 60;
+            const content = `
+                <svg viewBox="0 0 ${viewBoxWidth} 200" class="w-full h-40">
+                    ${data.map((d, index) => `
+                        <g transform="translate(${index * 60}, 0)">
+                            <rect
+                                x="10"
+                                y="${200 - (d.value / max) * 150}"
+                                width="40"
+                                height="${(d.value / max) * 150}"
+                                fill="${color}"
+                                class="transition-all duration-500 ease-out"
+                                rx="5"
+                            />
+                            <text x="30" y="195" text-anchor="middle" font-size="12" fill="#6B7280">${d.label}</text>
+                            <text x="30" y="${200 - (d.value / max) * 150 - 5}" text-anchor="middle" font-size="12" font-weight="bold" fill="#374151">${d.value}</text>
+                        </g>
+                    `).join('')}
+                </svg>
+            `;
+            return renderCard(title, content);
+        }
 
-    const points = data.map((d, i) => {
-        const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
-        const y = height - padding - ((d.value - min) / range) * (height - 2 * padding);
-        return { x, y, value: d.value, label: d.label };
-    });
+        function renderDashboard() {
+            const { timePeriod } = window.appState;
+            const trendData = window.getTrendData(timePeriod);
+            const timePeriodOptions = [
+                { value: '30days', label: 'Last 30 Days' },
+                { value: '90days', label: 'Last 90 Days' },
+                { value: 'ytd', label: 'Year To Date' },
+            ];
+            
+            const currentPeriodLabel = timePeriodOptions.find(o => o.value === timePeriod).label;
 
-    const linePath = points.map((point, i) => 
-        `${i === 0 ? 'M' : 'L'} ${point.x},${point.y}`
-    ).join(' ');
+            const defectData = [
+                { label: 'D01', value: 15 },
+                { label: 'D02', value: 25 },
+                { label: 'D03', value: 5 },
+                { label: 'Other', value: 10 },
+            ];
+            
+            const html = `
+                <div class="space-y-8">
+                    <h1 class="text-4xl font-extrabold text-gray-900">Dashboard Overview</h1>
+                    
+                    <div class="flex justify-end">
+                        ${renderSelect({ 
+                            id: 'timePeriodFilter', 
+                            label: 'Time Period Filter', 
+                            value: timePeriod, 
+                            onChange: `setState({ timePeriod: event.target.value })`, 
+                            options: timePeriodOptions, 
+                            className: 'w-48 mb-0' 
+                        })}
+                    </div>
+                    
+                    <!-- KPI Section -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        ${renderStatCard('Orders Completed (MTD)', 1450, 'Units', 3.5, 'Factory', 'text-indigo-600')}
+                        ${renderStatCard('Current Yield Rate', 97.8, '%', 0.1, 'TrendingUp', 'text-green-600')}
+                        ${renderStatCard('Avg. Cycle Time', 4.2, 'hrs', -2.1, 'Clock', 'text-yellow-600')}
+                        ${renderStatCard('Open QC Lots', 12, 'Lots', -15, 'CheckSquare', 'text-red-600')}
+                    </div>
+                    
+                    <!-- Trend Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        ${renderLineChart(trendData.ordersCompleted, `Orders Completed Trend (${currentPeriodLabel})`, '#4F46E5')}
+                        ${renderLineChart(trendData.yieldRate, `Yield Rate Trend (${currentPeriodLabel})`, '#10B981')}
+                    </div>
+                    
+                    <!-- Defects Bar Chart -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        ${renderBarChart(defectData, 'Top Defects by Count (MTD)', '#EF4444')}
+                        ${renderCard('Module Status Overview', `
+                            <p class="text-gray-600">This area could display module-specific uptime, recent activities, or pending high-priority tasks.</p>
+                            <ul class="mt-4 space-y-2 text-sm text-gray-700">
+                                <li class="flex items-center">${getIcon('CheckSquare', 'w-4 h-4 text-green-500 mr-2')} Assembly: Running smoothly (99.9% uptime)</li>
+                                <li class="flex items-center">${getIcon('XCircle', 'w-4 h-4 text-red-500 mr-2')} Pattern: System maintenance scheduled tonight.</li>
+                            </ul>
+                        `)}
+                    </div>
+                </div>
+            `;
+            return html;
+        }
 
-    return (
-        <Card title={title}>
-            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48">
-                {/* Y-Axis Label (Max) */}
-                <text x="5" y="15" fontSize="10" fill="#6B7280" textAnchor="start">{max}</text>
-                {/* Y-Axis Label (Min) */}
-                <text x="5" y={height - 5} fontSize="10" fill="#6B7280" textAnchor="start">{min}</text>
+        // --- Production Workflow Content ---
 
-                {/* Line Path */}
-                <path d={linePath} fill="none" stroke={color} strokeWidth="3" vectorEffect="non-scaling-stroke" />
-
-                {/* Data Points */}
-                {points.map((point, i) => (
-                    <g key={i}>
-                        <circle cx={point.x} cy={point.y} r={pointRadius} fill={color} stroke="white" strokeWidth="2" />
-                        {/* Label at the bottom */}
-                        <text x={point.x} y={height - 2} textAnchor="middle" fontSize="10" fill="#6B7280">{point.label}</text>
-                    </g>
-                ))}
-            </svg>
-        </Card>
-    );
-};
-
-
-const Button = ({ children, onClick, disabled = false, variant = 'primary', className = '' }) => {
-    let baseStyles = 'px-4 py-2 font-medium rounded-lg transition duration-150 shadow-md';
-    if (variant === 'primary') {
-        baseStyles += ' bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400';
-    } else if (variant === 'secondary') {
-        baseStyles += ' bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50 disabled:text-gray-400 disabled:border-gray-400';
-    } else if (variant === 'danger') {
-        baseStyles += ' bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400';
-    }
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={`${baseStyles} ${className} ${disabled ? 'cursor-not-allowed opacity-75' : ''}`}
-        >
-            {children}
-        </button>
-    );
-};
-
-const Input = ({ label, type = 'text', value, onChange, placeholder = '', required = false, className = '' }) => (
-    <div className={`mb-4 ${className}`}>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-        <input
-            type={type}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            required={required}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-        />
-    </div>
-);
-
-const Select = ({ label, value, onChange, options, required = false, className = '' }) => (
-    <div className={`mb-4 ${className}`}>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-        <select
-            value={value}
-            onChange={onChange}
-            required={required}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 bg-white"
-        >
-            {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                    {option.label}
-                </option>
-            ))}
-        </select>
-    </div>
-);
-
-// --- Mock Data ---
-
-const mockOrders = [
-    { id: 'ORD-1001', materialCode: 'MAT-A1', targetQty: 500, status: 'CREATED', batch: 'BCH-001' },
-    { id: 'ORD-1002', materialCode: 'MAT-B2', targetQty: 750, status: 'CREATED', batch: 'BCH-002' },
-    { id: 'ORD-1003', materialCode: 'MAT-C3', targetQty: 200, status: 'RELEASED', batch: 'BCH-003' },
-];
-
-const mockInspections = [
-    { id: 'INS-001', lotId: 'LOT-901', materialCode: 'MAT-A1', status: 'PENDING', inspectedQty: 500 },
-    { id: 'INS-002', lotId: 'LOT-902', materialCode: 'MAT-B2', status: 'PENDING', inspectedQty: 750 },
-    { id: 'INS-003', lotId: 'LOT-903', materialCode: 'MAT-C3', status: 'COMPLETED', inspectedQty: 200 },
-];
-
-const mockDefectCodes = [
-    { value: 'D01', label: 'Scratch' },
-    { value: 'D02', label: 'Misalignment' },
-    { value: 'D03', label: 'Contamination' },
-];
-
-// Mock Trend Data for Charts
-const getTrendData = (period) => {
-    switch (period) {
-        case '90days':
-            return {
-                yieldRate: [
-                    { label: 'Wk1', value: 97.2 }, { label: 'Wk2', value: 97.5 }, { label: 'Wk3', value: 98.1 }, 
-                    { label: 'Wk4', value: 97.9 }, { label: 'Wk5', value: 97.0 }, { label: 'Wk6', value: 97.8 },
-                ],
-                ordersCompleted: [
-                    { label: 'Wk1', value: 120 }, { label: 'Wk2', value: 135 }, { label: 'Wk3', value: 150 }, 
-                    { label: 'Wk4', value: 140 }, { label: 'Wk5', value: 110 }, { label: 'Wk6', value: 160 },
-                ]
-            };
-        case 'ytd':
-            return {
-                yieldRate: [
-                    { label: 'Jan', value: 96.5 }, { label: 'Feb', value: 97.0 }, { label: 'Mar', value: 97.5 }, 
-                    { label: 'Apr', value: 97.8 }, { label: 'May', value: 98.0 }, { label: 'Jun', value: 97.5 },
-                ],
-                ordersCompleted: [
-                    { label: 'Jan', value: 450 }, { label: 'Feb', value: 510 }, { label: 'Mar', value: 600 }, 
-                    { label: 'Apr', value: 550 }, { label: 'May', value: 630 }, { label: 'Jun', value: 700 },
-                ]
-            };
-        case '30days':
-        default:
-            return {
-                yieldRate: [
-                    { label: 'Day1', value: 97.5 }, { label: 'Day5', value: 97.9 }, { label: 'Day10', value: 97.7 }, 
-                    { label: 'Day15', value: 98.2 }, { label: 'Day20', value: 97.8 }, { label: 'Day30', value: 98.0 },
-                ],
-                ordersCompleted: [
-                    { label: 'Day1', value: 45 }, { label: 'Day5', value: 52 }, { label: 'Day10', value: 50 }, 
-                    { label: 'Day15', value: 60 }, { label: 'Day20', value: 55 }, { label: 'Day30', value: 65 },
-                ]
-            };
-    }
-};
-
-
-// --- Core Workflow Components (Unchanged) ---
-
-const OrderTable = ({ orders, onSelectOrder }) => (
-    <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-                <tr>
-                    {['Order ID', 'Material Code', 'Target QTY', 'Status', 'Batch', 'Action'].map(header => (
-                        <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {header}
-                        </th>
-                    ))}
+        function renderOrderTable(orders, onSelectOrder) {
+            const rows = orders.map(order => `
+                <tr class="hover:bg-indigo-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${order.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.materialCode}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.targetQty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                        <span class="px-2 inline-flex text-xs leading-5 rounded-full ${order.status === 'RELEASED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                            ${order.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.batch || 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        ${renderButton({
+                            text: 'Select',
+                            variant: 'secondary',
+                            onClick: onSelectOrder(order),
+                            className: 'text-xs'
+                        })}
+                    </td>
                 </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-indigo-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.materialCode}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.targetQty}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold" data-status={order.status}>
-                            <span className={`px-2 inline-flex text-xs leading-5 rounded-full ${order.status === 'RELEASED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                {order.status}
-                            </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.batch || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <Button variant="secondary" onClick={() => onSelectOrder(order)} className="text-xs">
-                                Select
-                            </Button>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
-    </div>
-);
+            `).join('');
 
-const ProductionWorkflow = ({ moduleName }) => {
-    const [step, setStep] = useState(1);
-    const [status, setStatus] = useState(false);
-    const [materialCode, setMaterialCode] = useState('');
-    const [selectedOrder, setSelectedOrder] = useState(null);
-    const [updateQty, setUpdateQty] = useState('');
-    const [yieldValue, setYieldValue] = useState('');
-    const [postingDate, setPostingDate] = useState(new Date().toISOString().substring(0, 10));
-    const [acceptedQty, setAcceptedQty] = useState('');
-    const [rejectedQty, setRejectedQty] = useState('');
-    
-    // Filter orders based on input and status
-    const availableOrders = mockOrders.filter(o => 
-        (o.materialCode.includes(materialCode.toUpperCase()) || materialCode === '') && o.status === 'CREATED'
-    );
-    
-    const releasedOrders = mockOrders.filter(o => 
-        (o.materialCode.includes(materialCode.toUpperCase()) || materialCode === '') && o.status === 'RELEASED'
-    );
-
-    const handleSelectOrder = (order) => {
-        setSelectedOrder(order);
-        setUpdateQty(order.targetQty);
-        setStep(2); // Move to Order Release/Update
-    };
-
-    const handleReleaseOrder = () => {
-        if (!updateQty) {
-            console.error('Please enter target quantity.');
-            // In a real app, use a modal/toast instead of console.error
-            return;
+            return `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                ${['Order ID', 'Material Code', 'Target QTY', 'Status', 'Batch', 'Action'].map(header => `
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>
+                                `).join('')}
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+                    </table>
+                </div>
+            `;
         }
-        // Simulation: Update order status to RELEASED in mock data
-        const orderToUpdate = mockOrders.find(o => o.id === selectedOrder.id);
-        if (orderToUpdate) {
-            orderToUpdate.status = 'RELEASED';
-        }
-        
-        console.log(`Order ${selectedOrder.id} released with new QTY: ${updateQty}`);
-        setSelectedOrder(null); // Clear selection for next step
-        setStep(3); // Move to Order Confirmation
-    };
-    
-    const handleConfirmOrder = () => {
-        if (!yieldValue || !acceptedQty || !rejectedQty) {
-            console.error('Please fill all required fields.');
-            return;
-        }
-        // Simulation: Finalize confirmation
-        console.log(`Order confirmed. Accepted: ${acceptedQty}, Rejected: ${rejectedQty}`);
-        
-        // Reset and go back to start
-        setSelectedOrder(null);
-        setStep(1);
-        setMaterialCode('');
-        setYieldValue('');
-        setAcceptedQty('');
-        setRejectedQty('');
-    };
-    
-    const renderStepContent = () => {
-        switch (step) {
-            case 1: // Production ON / Order Selection
-                return (
-                    <Card title="1. Select Order for Release">
-                        <div className="flex justify-between items-center mb-6 p-4 bg-indigo-50 rounded-lg">
-                            <h3 className="text-lg font-medium text-indigo-800">Production Status: <span className={`font-bold ${status ? 'text-green-600' : 'text-red-600'}`}>{status ? 'ON' : 'OFF'}</span></h3>
-                            <div className="flex items-center space-x-4">
-                                <label className="flex items-center cursor-pointer">
-                                    <span className="text-sm font-medium text-gray-700 mr-3">Exclude Option</span>
-                                    <div className="relative">
-                                        <input type="checkbox" id="toggleA" className="sr-only" checked={status} onChange={() => setStatus(!status)} />
-                                        <div className={`block ${status ? 'bg-green-400' : 'bg-gray-300'} w-14 h-8 rounded-full`}></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition ${status ? 'translate-x-6' : ''}`}></div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
 
-                        <Input 
-                            label="Enter Material Code (Filter Created Orders)" 
-                            value={materialCode} 
-                            onChange={(e) => setMaterialCode(e.target.value)} 
-                            placeholder="e.g., MAT-A1" 
-                            className="max-w-md"
-                        />
-                        <h3 className="text-md font-semibold mt-6 mb-3">List all Created Orders ({availableOrders.length})</h3>
-                        <OrderTable orders={availableOrders} onSelectOrder={handleSelectOrder} />
-                    </Card>
-                );
+        function renderProductionWorkflow(moduleName) {
+            const { 
+                productionStep, materialCodeFilter, selectedOrder, updateQty, yieldValue, 
+                postingDate, acceptedQty, rejectedQty 
+            } = window.appState;
+            const mockOrders = window.mockData.orders;
+            const status = true; // Simplified toggle state to always be ON for POC
 
-            case 2: // Order Release
-                return (
-                    <Card title={`2. Order Release: ${selectedOrder?.id}`}>
-                        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <p className="text-sm text-yellow-800">**UPDATE TARGET QTY** and confirm Batch details before releasing the order.</p>
-                            <p className="text-xs text-gray-500 mt-1">Current Target QTY: {selectedOrder?.targetQty}</p>
-                        </div>
-                        <Input 
-                            label="UPDATE TARGET QTY" 
-                            type="number" 
-                            value={updateQty} 
-                            onChange={(e) => setUpdateQty(e.target.value)} 
-                            required 
-                            className="max-w-md"
-                        />
-                        <Input 
-                            label="BATCH" 
-                            value={selectedOrder?.batch} 
-                            onChange={() => {}} // Read-only for POC
-                            disabled
-                            className="max-w-md"
-                        />
-                        <div className="flex space-x-4 mt-6">
-                            <Button onClick={() => setStep(1)} variant="secondary">Back to List</Button>
-                            <Button onClick={handleReleaseOrder} disabled={!updateQty}>Release Order</Button>
-                        </div>
-                    </Card>
-                );
+            // Filter logic
+            const upperCaseFilter = materialCodeFilter.toUpperCase();
+            const availableOrders = mockOrders.filter(o => 
+                (o.materialCode.includes(upperCaseFilter) || upperCaseFilter === '') && o.status === 'CREATED'
+            );
+            const releasedOrders = mockOrders.filter(o => 
+                (o.materialCode.includes(upperCaseFilter) || upperCaseFilter === '') && o.status === 'RELEASED'
+            );
+
+            // Action Handlers
+            window.handleSelectOrder = (order) => () => {
+                setState({ selectedOrder: order, updateQty: order.targetQty, productionStep: 2 });
+            };
             
-            case 3: // Order Confirmation
-                return (
-                    <Card title="3. Confirm Production Results">
-                        <p className="text-sm text-gray-600 mb-4">Select a released order and enter the production results.</p>
-                        
-                        <Input 
-                            label="Select Material Code (Filter Released Orders)" 
-                            value={materialCode} 
-                            onChange={(e) => setMaterialCode(e.target.value)} 
-                            placeholder="e.g., MAT-C3" 
-                            className="max-w-lg"
-                        />
-                        <h3 className="text-md font-semibold mt-6 mb-3">List of Released Orders ({releasedOrders.length})</h3>
-                        
-                        <div className="mb-6">
-                            <OrderTable 
-                                orders={releasedOrders} 
-                                onSelectOrder={(order) => setSelectedOrder(order)} 
-                            />
-                        </div>
+            window.handleReleaseOrder = () => {
+                if (!window.appState.updateQty) {
+                    alert('Please enter target quantity.');
+                    return;
+                }
+                const orderToUpdate = window.mockData.orders.find(o => o.id === window.appState.selectedOrder.id);
+                if (orderToUpdate) {
+                    orderToUpdate.status = 'RELEASED'; // Mock update
+                }
+                setState({ selectedOrder: null, productionStep: 3 });
+            };
 
-                        {selectedOrder && (
-                            <Card title={`Confirming Production for: ${selectedOrder.id}`} className="mt-6 bg-blue-50 border-blue-200">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input 
-                                        label="Enter the Yield" 
-                                        type="number" 
-                                        value={yieldValue} 
-                                        onChange={(e) => setYieldValue(e.target.value)} 
-                                        required 
-                                    />
-                                    <Input 
-                                        label="POSTING DATE" 
-                                        type="date" 
-                                        value={postingDate} 
-                                        onChange={(e) => setPostingDate(e.target.value)} 
-                                        required 
-                                    />
-                                    <Input 
-                                        label="Accepted QTY" 
-                                        type="number" 
-                                        value={acceptedQty} 
-                                        onChange={(e) => setAcceptedQty(e.target.value)} 
-                                        required 
-                                    />
-                                    <Input 
-                                        label="Rejected QTY" 
-                                        type="number" 
-                                        value={rejectedQty} 
-                                        onChange={(e) => setRejectedQty(e.target.value)} 
-                                        required 
-                                    />
-                                </div>
-                                <div className="flex justify-end mt-6">
-                                    <Button onClick={handleConfirmOrder} disabled={!acceptedQty || !rejectedQty || !yieldValue}>Confirm the Order</Button>
-                                </div>
-                            </Card>
-                        )}
-                        <Button onClick={() => setStep(1)} variant="secondary" className="mt-6">Back to Start</Button>
-                    </Card>
-                );
-            default:
-                return <p>Invalid step.</p>;
+            window.handleConfirmOrder = () => {
+                const state = window.appState;
+                if (!state.yieldValue || !state.acceptedQty || !state.rejectedQty) {
+                    alert('Please fill all required fields.');
+                    return;
+                }
+                alert(`Order confirmed. Accepted: ${state.acceptedQty}, Rejected: ${state.rejectedQty}`);
+                setState({ 
+                    selectedOrder: null, productionStep: 1, materialCodeFilter: '', 
+                    yieldValue: '', acceptedQty: '', rejectedQty: '' 
+                });
+            };
+
+            let content;
+            switch (productionStep) {
+                case 1:
+                    content = renderCard('1. Select Order for Release', `
+                        <div class="flex justify-between items-center mb-6 p-4 bg-indigo-50 rounded-lg">
+                            <h3 class="text-lg font-medium text-indigo-800">Production Status: <span class="font-bold ${status ? 'text-green-600' : 'text-red-600'}">${status ? 'ON' : 'OFF'}</span></h3>
+                        </div>
+                        ${renderInput({ 
+                            id: 'prodFilter', label: 'Enter Material Code (Filter Created Orders)', 
+                            value: materialCodeFilter, 
+                            onChange: `setState({ materialCodeFilter: event.target.value })`, 
+                            placeholder: 'e.g., MAT-A1', className: 'max-w-md' 
+                        })}
+                        <h3 class="text-md font-semibold mt-6 mb-3">List all Created Orders (${availableOrders.length})</h3>
+                        ${renderOrderTable(availableOrders, window.handleSelectOrder)}
+                    `);
+                    break;
+                case 2:
+                    content = renderCard(`2. Order Release: ${selectedOrder?.id}`, `
+                        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p class="text-sm text-yellow-800">**UPDATE TARGET QTY** and confirm Batch details before releasing the order.</p>
+                            <p class="text-xs text-gray-500 mt-1">Current Target QTY: ${selectedOrder?.targetQty}</p>
+                        </div>
+                        ${renderInput({ 
+                            id: 'updateQty', label: 'UPDATE TARGET QTY', type: 'number', 
+                            value: updateQty, 
+                            onChange: `setState({ updateQty: event.target.value })`, 
+                            required: true, className: 'max-w-md' 
+                        })}
+                        ${renderInput({ 
+                            id: 'batch', label: 'BATCH', value: selectedOrder?.batch, 
+                            onChange: ``, disabled: true, className: 'max-w-md' 
+                        })}
+                        <div class="flex space-x-4 mt-6">
+                            ${renderButton({ text: 'Back to List', variant: 'secondary', onClick: `setState({ productionStep: 1 })` })}
+                            ${renderButton({ text: 'Release Order', onClick: `handleReleaseOrder()`, disabled: !updateQty })}
+                        </div>
+                    `);
+                    break;
+                case 3:
+                    const confirmCard = selectedOrder ? renderCard(`Confirming Production for: ${selectedOrder.id}`, `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${renderInput({ 
+                                id: 'yield', label: 'Enter the Yield', type: 'number', 
+                                value: yieldValue, 
+                                onChange: `setState({ yieldValue: event.target.value })`, required: true 
+                            })}
+                            ${renderInput({ 
+                                id: 'postDate', label: 'POSTING DATE', type: 'date', 
+                                value: postingDate, 
+                                onChange: `setState({ postingDate: event.target.value })`, required: true 
+                            })}
+                            ${renderInput({ 
+                                id: 'acceptedQty', label: 'Accepted QTY', type: 'number', 
+                                value: acceptedQty, 
+                                onChange: `setState({ acceptedQty: event.target.value })`, required: true 
+                            })}
+                            ${renderInput({ 
+                                id: 'rejectedQty', label: 'Rejected QTY', type: 'number', 
+                                value: rejectedQty, 
+                                onChange: `setState({ rejectedQty: event.target.value })`, required: true 
+                            })}
+                        </div>
+                        <div class="flex justify-end mt-6">
+                            ${renderButton({ 
+                                text: 'Confirm the Order', 
+                                onClick: `handleConfirmOrder()`, 
+                                disabled: !acceptedQty || !rejectedQty || !yieldValue 
+                            })}
+                        </div>
+                    `, 'mt-6 bg-blue-50 border-blue-200') : '';
+
+                    content = renderCard('3. Confirm Production Results', `
+                        <p class="text-sm text-gray-600 mb-4">Select a released order and enter the production results.</p>
+                        ${renderInput({ 
+                            id: 'confirmFilter', label: 'Select Material Code (Filter Released Orders)', 
+                            value: materialCodeFilter, 
+                            onChange: `setState({ materialCodeFilter: event.target.value })`, 
+                            placeholder: 'e.g., MAT-C3', className: 'max-w-lg' 
+                        })}
+                        <h3 class="text-md font-semibold mt-6 mb-3">List of Released Orders (${releasedOrders.length})</h3>
+                        <div class="mb-6">
+                            ${renderOrderTable(releasedOrders, window.handleSelectOrder)}
+                        </div>
+                        ${confirmCard}
+                        ${renderButton({ text: 'Back to Start', variant: 'secondary', onClick: `setState({ productionStep: 1 })`, className: 'mt-6' })}
+                    `);
+                    break;
+                default:
+                    content = '<p>Invalid step.</p>';
+            }
+
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-gray-900">${moduleName} Production Workflow</h2>
+                    <p class="text-gray-600">Guidance for the ${moduleName} manufacturing process: Order Release and Confirmation.</p>
+                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                        <span class="px-3 py-1 rounded-full ${productionStep === 1 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}">1. Select Order</span>
+                        ${getIcon('ChevronRight', 'w-4 h-4')}
+                        <span class="px-3 py-1 rounded-full ${productionStep === 2 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}">2. Release Order</span>
+                        ${getIcon('ChevronRight', 'w-4 h-4')}
+                        <span class="px-3 py-1 rounded-full ${productionStep === 3 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}">3. Confirm Production</span>
+                    </div>
+                    ${content}
+                </div>
+            `;
         }
-    };
 
-    return (
-        <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-900">{moduleName} Production Workflow</h2>
-            <p className="text-gray-600">Guidance for the {moduleName} manufacturing process: Order Release and Confirmation.</p>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <span className={`px-3 py-1 rounded-full ${step === 1 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}`}>1. Select Order</span>
-                <ChevronRight className="w-4 h-4" />
-                <span className={`px-3 py-1 rounded-full ${step === 2 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}`}>2. Release Order</span>
-                <ChevronRight className="w-4 h-4" />
-                <span className={`px-3 py-1 rounded-full ${step === 3 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}`}>3. Confirm Production</span>
-            </div>
+        // --- QC Workflow Content ---
 
-            {renderStepContent()}
-        </div>
-    );
-};
+        function renderInspectionTable(inspections, onSelect) {
+             const rows = inspections.map(insp => `
+                <tr class="hover:bg-indigo-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${insp.lotId}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${insp.materialCode}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${insp.inspectedQty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 rounded-full ${insp.status === 'PENDING' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${insp.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        ${renderButton({
+                            text: 'Select Inspection Lot',
+                            variant: 'secondary',
+                            onClick: onSelect(insp),
+                            disabled: insp.status === 'COMPLETED',
+                            className: 'text-xs'
+                        })}
+                    </td>
+                </tr>
+            `).join('');
 
-const QCWorkflow = ({ moduleName }) => {
-    const [step, setStep] = useState(1);
-    const [dateRange, setDateRange] = useState({ from: new Date().toISOString().substring(0, 10), to: new Date().toISOString().substring(0, 10) });
-    const [materialCode, setMaterialCode] = useState('');
-    const [inspectionStatus, setInspectionStatus] = useState('PENDING');
-    const [selectedInspection, setSelectedInspection] = useState(null);
-    const [okQty, setOkQty] = useState('');
-    const [notOkQty, setNotOkQty] = useState('');
-    const [defectsCode, setDefectsCode] = useState('');
-    const [usageDecision, setUsageDecision] = useState('U1');
-
-    const availableInspections = mockInspections.filter(i => 
-        (i.materialCode.includes(materialCode.toUpperCase()) || materialCode === '') && i.status === inspectionStatus.toUpperCase()
-    );
-
-    const handleSelectInspection = (inspection) => {
-        setSelectedInspection(inspection);
-        setStep(2); // Move to Inspection Lot Details
-    };
-
-    const handleProcessDecision = () => {
-        if (!okQty || !notOkQty || !defectsCode) {
-            console.error('Please complete the result and defects capture.');
-            return;
+            return `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                ${['Lot ID', 'Material Code', 'Inspected QTY', 'Status', 'Action'].map(header => `
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>
+                                `).join('')}
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+                    </table>
+                </div>
+            `;
         }
-        
-        // Simulation: Update inspection status
-        const inspToUpdate = mockInspections.find(i => i.id === selectedInspection.id);
-        if (inspToUpdate) {
-            inspToUpdate.status = 'COMPLETED';
-        }
-        
-        console.log(`QC Done for lot ${selectedInspection.lotId}. OK QTY: ${okQty}, Decision: ${usageDecision}`);
-        
-        // Reset and go back to start
-        setSelectedInspection(null);
-        setStep(1);
-        setOkQty('');
-        setNotOkQty('');
-        setDefectsCode('');
-        setUsageDecision('U1');
-    };
 
-    const renderStepContent = () => {
-        switch (step) {
-            case 1: // Inspection List Selection
-                return (
-                    <Card title="1. Select Inspection Lot">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <Input label="Lot Creation Date (From)" type="date" value={dateRange.from} onChange={(e) => setDateRange({...dateRange, from: e.target.value})} />
-                            <Input label="Lot Creation Date (To)" type="date" value={dateRange.to} onChange={(e) => setDateRange({...dateRange, to: e.target.value})} />
-                            <Input label="Material Code (Filter)" value={materialCode} onChange={(e) => setMaterialCode(e.target.value)} placeholder="e.g., MAT-A1" />
-                            <Select 
-                                label="Inspection Status" 
-                                value={inspectionStatus} 
-                                onChange={(e) => setInspectionStatus(e.target.value)} 
-                                options={[{ value: 'PENDING', label: 'PENDING' }, { value: 'COMPLETED', label: 'COMPLETED' }]}
-                            />
+
+        function renderQCWorkflow(moduleName) {
+            const { 
+                qcStep, qcDateFrom, qcDateTo, qcMaterialCodeFilter, inspectionStatus, 
+                selectedInspection, okQty, notOkQty, defectsCode, usageDecision 
+            } = window.appState;
+            const mockInspections = window.mockData.inspections;
+            const mockDefectCodes = window.mockData.defectCodes;
+
+            // Filter logic
+            const upperCaseFilter = qcMaterialCodeFilter.toUpperCase();
+            const availableInspections = mockInspections.filter(i => 
+                (i.materialCode.includes(upperCaseFilter) || upperCaseFilter === '') && i.status === inspectionStatus.toUpperCase()
+            );
+
+            // Action Handlers
+            window.handleSelectInspection = (insp) => () => {
+                setState({ selectedInspection: insp, qcStep: 2 });
+            };
+
+            window.handleProcessDecision = () => {
+                const state = window.appState;
+                if (!state.okQty || !state.notOkQty || !state.defectsCode) {
+                    alert('Please complete the result and defects capture.');
+                    return;
+                }
+                
+                // Mock update inspection status
+                const inspToUpdate = window.mockData.inspections.find(i => i.id === state.selectedInspection.id);
+                if (inspToUpdate) {
+                    inspToUpdate.status = 'COMPLETED';
+                }
+                
+                alert(`QC Done for lot ${state.selectedInspection.lotId}. OK QTY: ${state.okQty}, Decision: ${state.usageDecision}`);
+                
+                setState({ 
+                    selectedInspection: null, qcStep: 1, 
+                    okQty: '', notOkQty: '', defectsCode: '', usageDecision: 'U1' 
+                });
+            };
+
+            let content;
+            switch (qcStep) {
+                case 1:
+                    content = renderCard('1. Select Inspection Lot', `
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            ${renderInput({ 
+                                id: 'dateFrom', label: 'Lot Creation Date (From)', type: 'date', 
+                                value: qcDateFrom, 
+                                onChange: `setState({ qcDateFrom: event.target.value })` 
+                            })}
+                            ${renderInput({ 
+                                id: 'dateTo', label: 'Lot Creation Date (To)', type: 'date', 
+                                value: qcDateTo, 
+                                onChange: `setState({ qcDateTo: event.target.value })` 
+                            })}
+                            ${renderInput({ 
+                                id: 'qcFilter', label: 'Material Code (Filter)', 
+                                value: qcMaterialCodeFilter, 
+                                onChange: `setState({ qcMaterialCodeFilter: event.target.value })`, 
+                                placeholder: 'e.g., MAT-A1' 
+                            })}
+                            ${renderSelect({ 
+                                id: 'inspStatus', label: 'Inspection Status', 
+                                value: inspectionStatus, 
+                                onChange: `setState({ inspectionStatus: event.target.value })`, 
+                                options: [{ value: 'PENDING', label: 'PENDING' }, { value: 'COMPLETED', label: 'COMPLETED' }]
+                            })}
+                        </div>
+                        <h3 class="text-md font-semibold mt-6 mb-3">Inspection List (${availableInspections.length})</h3>
+                        ${renderInspectionTable(availableInspections, window.handleSelectInspection)}
+                    `);
+                    break;
+                case 2:
+                    const defectsOptions = [{ value: '', label: 'Select Defect' }, ...mockDefectCodes];
+                    const decisionOptions = [
+                        { value: 'U1', label: 'U1 - Accept' }, 
+                        { value: 'U2', label: 'U2 - Reject' }, 
+                        { value: 'U3', label: 'U3 - Rework' }
+                    ];
+
+                    content = renderCard(`2. Result and Usage Decision for Lot: ${selectedInspection?.lotId}`, `
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p class="text-sm text-blue-800">Inspected QTY: <span class="font-bold">${selectedInspection?.inspectedQty}</span></p>
+                            <p class="text-xs text-gray-500 mt-1">Record the inspection result and make a final usage decision.</p>
                         </div>
 
-                        <h3 className="text-md font-semibold mt-6 mb-3">Inspection List ({availableInspections.length})</h3>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        {['Lot ID', 'Material Code', 'Inspected QTY', 'Status', 'Action'].map(header => (
-                                            <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {availableInspections.map((insp) => (
-                                        <tr key={insp.id} className="hover:bg-indigo-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{insp.lotId}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{insp.materialCode}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{insp.inspectedQty}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 inline-flex text-xs leading-5 rounded-full ${insp.status === 'PENDING' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                    {insp.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <Button variant="secondary" onClick={() => handleSelectInspection(insp)} className="text-xs" disabled={insp.status === 'COMPLETED'}>
-                                                    Select Inspection Lot
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                );
-
-            case 2: // Result and UD
-                return (
-                    <Card title={`2. Result and Usage Decision for Lot: ${selectedInspection?.lotId}`}>
-                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <p className="text-sm text-blue-800">Inspected QTY: <span className="font-bold">{selectedInspection?.inspectedQty}</span></p>
-                            <p className="text-xs text-gray-500 mt-1">Record the inspection result and make a final usage decision.</p>
-                        </div>
-
-                        <h3 className="text-lg font-medium text-gray-800 mb-3">Result and Defects</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Input label="OK QTY" type="number" value={okQty} onChange={(e) => setOkQty(e.target.value)} required />
-                            <Input label="Not OK QTY" type="number" value={notOkQty} onChange={(e) => setNotOkQty(e.target.value)} required />
-                            <Select 
-                                label="Defects Code (QTY Wise)" 
-                                value={defectsCode} 
-                                onChange={(e) => setDefectsCode(e.target.value)} 
-                                options={[{ value: '', label: 'Select Defect' }, ...mockDefectCodes]}
-                                required
-                            />
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">Result and Defects</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${renderInput({ 
+                                id: 'okQty', label: 'OK QTY', type: 'number', 
+                                value: okQty, 
+                                onChange: `setState({ okQty: event.target.value })`, required: true 
+                            })}
+                            ${renderInput({ 
+                                id: 'notOkQty', label: 'Not OK QTY', type: 'number', 
+                                value: notOkQty, 
+                                onChange: `setState({ notOkQty: event.target.value })`, required: true 
+                            })}
+                            ${renderSelect({ 
+                                id: 'defectsCode', label: 'Defects Code (QTY Wise)', 
+                                value: defectsCode, 
+                                onChange: `setState({ defectsCode: event.target.value })`, 
+                                options: defectsOptions, required: true
+                            })}
                         </div>
                         
-                        <h3 className="text-lg font-medium text-gray-800 mb-3 mt-6">Usage Decision (UD)</h3>
-                        <Select 
-                            label="Usgae Decision" 
-                            value={usageDecision} 
-                            onChange={(e) => setUsageDecision(e.target.value)} 
-                            options={[{ value: 'U1', label: 'U1 - Accept' }, { value: 'U2', label: 'U2 - Reject' }, { value: 'U3', label: 'U3 - Rework' }]}
-                            className="max-w-md"
-                        />
+                        <h3 class="text-lg font-medium text-gray-800 mb-3 mt-6">Usage Decision (UD)</h3>
+                        ${renderSelect({ 
+                            id: 'udDecision', label: 'Usgae Decision', 
+                            value: usageDecision, 
+                            onChange: `setState({ usageDecision: event.target.value })`, 
+                            options: decisionOptions,
+                            className: 'max-w-md'
+                        })}
 
-                        <div className="flex space-x-4 mt-8">
-                            <Button onClick={() => setStep(1)} variant="secondary">Back to List</Button>
-                            <Button onClick={handleProcessDecision} disabled={!okQty || !notOkQty || !defectsCode}>DONE (Process QC)</Button>
+                        <div class="flex space-x-4 mt-8">
+                            ${renderButton({ text: 'Back to List', variant: 'secondary', onClick: `setState({ qcStep: 1 })` })}
+                            ${renderButton({ 
+                                text: 'DONE (Process QC)', 
+                                onClick: `handleProcessDecision()`, 
+                                disabled: !okQty || !notOkQty || !defectsCode
+                            })}
                         </div>
-                    </Card>
-                );
-            default:
-                return <p>Invalid step.</p>;
+                    `);
+                    break;
+                default:
+                    content = '<p>Invalid step.</p>';
+            }
+
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-gray-900">${moduleName} QC Workflow</h2>
+                    <p class="text-gray-600">Inspection selection, result recording, and final Usage Decision (UD).</p>
+                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                        <span class="px-3 py-1 rounded-full ${qcStep === 1 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}">1. Select Inspection</span>
+                        ${getIcon('ChevronRight', 'w-4 h-4')}
+                        <span class="px-3 py-1 rounded-full ${qcStep === 2 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}">2. Enter Results & Decision</span>
+                    </div>
+                    ${content}
+                </div>
+            `;
         }
-    };
-
-    return (
-        <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-900">{moduleName} QC Workflow</h2>
-            <p className="text-gray-600">Inspection selection, result recording, and final Usage Decision (UD).</p>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <span className={`px-3 py-1 rounded-full ${step === 1 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}`}>1. Select Inspection</span>
-                <ChevronRight className="w-4 h-4" />
-                <span className={`px-3 py-1 rounded-full ${step === 2 ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-gray-100'}`}>2. Enter Results & Decision</span>
-            </div>
-
-            {renderStepContent()}
-        </div>
-    );
-};
 
 
-// New component to handle tabs
-const ModuleContainer = ({ moduleName, currentWorkflow, setCurrentWorkflow }) => {
-    const tabs = [
-        { id: 'production', label: 'Production Workflow', icon: Factory, component: ProductionWorkflow },
-        { id: 'qc', label: 'QC Workflow', icon: CheckSquare, component: QCWorkflow },
-    ];
-    
-    const CurrentComponent = tabs.find(t => t.id === currentWorkflow)?.component || ProductionWorkflow;
+        // --- Module Container (Tabbed Interface) ---
 
-    return (
-        <div className="space-y-6">
-            <h1 className="text-4xl font-extrabold text-gray-900">{moduleName} Module</h1>
-            
-            {/* Workflow Tabs */}
-            <div className="flex border-b border-gray-200">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setCurrentWorkflow(tab.id)}
-                        className={`flex items-center px-4 py-3 text-sm font-semibold transition duration-150 border-b-4 
-                            ${currentWorkflow === tab.id
-                                ? 'border-indigo-600 text-indigo-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
-                    >
-                        <tab.icon className="w-5 h-5 mr-2" />
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+        function renderModuleContainer(moduleName) {
+            const { currentWorkflow } = window.appState;
+            const tabs = [
+                { id: 'production', label: 'Production Workflow', icon: 'Factory' },
+                { id: 'qc', label: 'QC Workflow', icon: 'CheckSquare' },
+            ];
 
-            {/* Content Area */}
-            <div className="pt-4">
-                <CurrentComponent moduleName={moduleName} />
-            </div>
-        </div>
-    );
-};
+            const tabsHtml = tabs.map(tab => `
+                <button
+                    onclick="setState({ currentWorkflow: '${tab.id}' })"
+                    class="flex items-center px-4 py-3 text-sm font-semibold transition duration-150 border-b-4 
+                        ${currentWorkflow === tab.id
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }"
+                >
+                    ${getIcon(tab.icon, 'w-5 h-5 mr-2')}
+                    ${tab.label}
+                </button>
+            `).join('');
 
+            let contentHtml = '';
+            if (currentWorkflow === 'production') {
+                contentHtml = renderProductionWorkflow(moduleName);
+            } else if (currentWorkflow === 'qc') {
+                contentHtml = renderQCWorkflow(moduleName);
+            }
 
-// --- Dashboard Component (Recreated with Stats and Charts) ---
+            return `
+                <div class="space-y-6">
+                    <h1 class="text-4xl font-extrabold text-gray-900">${moduleName} Module</h1>
+                    
+                    <div class="flex border-b border-gray-200">${tabsHtml}</div>
 
-const Dashboard = () => {
-    const timePeriodOptions = [
-        { value: '30days', label: 'Last 30 Days' },
-        { value: '90days', label: 'Last 90 Days' },
-        { value: 'ytd', label: 'Year To Date' },
-    ];
-    
-    const [timePeriod, setTimePeriod] = useState('30days');
-    const trendData = getTrendData(timePeriod);
+                    <div class="pt-4">${contentHtml}</div>
+                </div>
+            `;
+        }
 
-    // Simulated Production KPIs (remain constant regardless of filter for simplicity in this mock)
-    const totalOrdersCompleted = 1450;
-    const currentYieldRate = 97.8;
-    const averageCycleTime = 4.2; // hours
-    
-    // Simulated QC KPIs
-    const openInspectionLots = 12;
-    const defectRate = 2.2; // %
-    
-    // Chart data for Bar Chart (remains static for simplicity)
-    const defectData = [
-        { label: 'D01', value: 15 },
-        { label: 'D02', value: 25 },
-        { label: 'D03', value: 5 },
-        { label: 'Other', value: 10 },
-    ];
+        // --- Main Content Renderer ---
 
+        function renderMainContent() {
+            const mainContent = document.getElementById('main-content');
+            const { currentPage } = window.appState;
 
-    return (
-        <div className="space-y-8">
-            <h1 className="text-4xl font-extrabold text-gray-900">Dashboard Overview</h1>
-            
-            {/* Filter */}
-            <div className="flex justify-end">
-                 <Select 
-                    label="Time Period Filter"
-                    value={timePeriod}
-                    onChange={(e) => setTimePeriod(e.target.value)}
-                    options={timePeriodOptions}
-                    className="w-48 mb-0"
-                />
-            </div>
-            
-            {/* KPI Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="Orders Completed (MTD)" 
-                    value={totalOrdersCompleted} 
-                    unit="Units" 
-                    change={3.5} 
-                    icon={Factory} 
-                    colorClass="text-indigo-600"
-                />
-                <StatCard 
-                    title="Current Yield Rate" 
-                    value={currentYieldRate} 
-                    unit="%" 
-                    change={0.1} 
-                    icon={TrendingUp} 
-                    colorClass="text-green-600"
-                />
-                <StatCard 
-                    title="Avg. Cycle Time" 
-                    value={averageCycleTime} 
-                    unit="hrs" 
-                    change={-2.1} 
-                    icon={Clock} 
-                    colorClass="text-yellow-600"
-                />
-                <StatCard 
-                    title="Open QC Lots" 
-                    value={openInspectionLots} 
-                    unit="Lots" 
-                    change={-15} 
-                    icon={CheckSquare} 
-                    colorClass="text-red-600"
-                />
-            </div>
-            
-            {/* Trend Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SimpleLineChart 
-                    data={trendData.ordersCompleted} 
-                    title={`Orders Completed Trend (${timePeriodOptions.find(o => o.value === timePeriod).label})`} 
-                    color="#4F46E5" // Indigo
-                />
-                <SimpleLineChart 
-                    data={trendData.yieldRate} 
-                    title={`Yield Rate Trend (${timePeriodOptions.find(o => o.value === timePeriod).label})`} 
-                    color="#10B981" // Green
-                />
-            </div>
-            
-            {/* Defects Bar Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SimpleBarChart 
-                    data={defectData} 
-                    title="Top Defects by Count (MTD)" 
-                    color="#EF4444" // Red
-                />
-                <Card title="Module Status Overview">
-                    <p className="text-gray-600">This area could display module-specific uptime, recent activities, or pending high-priority tasks.</p>
-                    <ul className="mt-4 space-y-2 text-sm text-gray-700">
-                        <li className="flex items-center"><CheckSquare className="w-4 h-4 text-green-500 mr-2"/> Assembly: Running smoothly (99.9% uptime)</li>
-                        <li className="flex items-center"><XCircle className="w-4 h-4 text-red-500 mr-2"/> Pattern: System maintenance scheduled tonight.</li>
-                    </ul>
-                </Card>
-            </div>
-            
-        </div>
-    );
-};
+            if (!isAuthReady) {
+                mainContent.innerHTML = `
+                    <div class="flex items-center justify-center h-full w-full">
+                        ${getIcon('Loader2', 'w-8 h-8 animate-spin text-indigo-600 mr-2')}
+                        <span class="text-gray-600 font-medium">Loading User Session...</span>
+                    </div>
+                `;
+                return;
+            }
 
-
-// --- App Component and Navigation ---
-
-const Sidebar = ({ currentPage, setCurrentPage, userId, auth }) => {
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    const navItems = [
-        { name: 'Dashboard', icon: Home, page: 'dashboard' },
-        { name: 'Assembly', icon: Factory, page: 'assembly' },
-        { name: 'Pattern', icon: CheckSquare, page: 'pattern' },
-    ];
-
-    // Mock/Firebase user details
-    const userName = auth?.currentUser?.displayName || 'Manufacturing Lead';
-    const userInitial = userName.charAt(0).toUpperCase();
-
-    const handleLogout = async () => {
-        if (auth) {
-            try {
-                // This clears the current session. The onAuthStateChanged listener will re-sign the user in.
-                await signOut(auth);
-            } catch (error) {
-                console.error("Error signing out:", error);
+            switch (currentPage) {
+                case 'dashboard':
+                    mainContent.innerHTML = renderDashboard();
+                    break;
+                case 'assembly':
+                    mainContent.innerHTML = renderModuleContainer('Assembly');
+                    break;
+                case 'pattern':
+                    mainContent.innerHTML = renderModuleContainer('Pattern');
+                    break;
+                default:
+                    mainContent.innerHTML = renderDashboard();
             }
         }
-        setIsMenuOpen(false); // Close menu on action
-    };
+        
+        // --- Initialize App on Window Load ---
+        window.onload = function() {
+            window.initializeApp(); 
+            // The initial render is called inside the onAuthStateChanged listener
+        };
 
-    const handleMenuClick = (action) => {
-        switch (action) {
-            case 'profile':
-                // Placeholder for navigating to a profile page or opening a modal
-                console.log("Navigating to Profile Settings...");
-                alert("Profile View/Edit feature would open here.");
-                break;
-            case 'password':
-                // Placeholder for changing password logic
-                console.log("Opening Change Password prompt...");
-                alert("Change Password functionality would be implemented here.");
-                break;
-            case 'logout':
-                handleLogout();
-                break;
-            default:
-                break;
+    </script>
+    <style>
+        /* Simple Tailwind-friendly animation for the menu */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        setIsMenuOpen(false);
-    };
+        .animate-slideUp {
+            animation: slideUp 0.15s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 flex font-sans antialiased">
+    <!-- Sidebar -->
+    <div id="sidebar" class="w-64 flex-shrink-0 bg-gray-900 text-white flex flex-col h-screen rounded-r-xl shadow-2xl fixed">
+        <!-- Content will be rendered by renderSidebar() -->
+    </div>
 
-    const UserMenuItem = ({ icon: Icon, label, action }) => (
-        <button
-            onClick={() => handleMenuClick(action)}
-            className="w-full flex items-center p-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg transition duration-150"
-        >
-            <Icon className="w-4 h-4 mr-3" />
-            {label}
-        </button>
-    );
-
-    return (
-        <div className="w-64 flex-shrink-0 bg-gray-900 text-white flex flex-col h-full rounded-r-xl shadow-2xl">
-            <div className="p-6">
-                <h1 className="text-2xl font-extrabold tracking-tight text-indigo-400">LogMate</h1>
-                <p className="text-xs text-gray-400 mt-1">Enterprise Workflow</p>
-            </div>
-            
-            <nav className="flex-grow space-y-2 p-4">
-                {navItems.map((item) => (
-                    <button
-                        key={item.page}
-                        onClick={() => setCurrentPage(item.page)}
-                        className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition duration-150 ${
-                            currentPage === item.page
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                        }`}
-                    >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        {item.name}
-                    </button>
-                ))}
-            </nav>
-
-            {/* User Profile and Collapsible Menu Section */}
-            <div className="p-4 border-t border-gray-800 relative">
-                <button 
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    className="w-full flex items-center space-x-3 p-2 -m-2 rounded-lg transition duration-150 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-50"
-                >
-                    {/* User Picture Placeholder */}
-                    <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-lg font-bold text-white border-2 border-indigo-400 flex-shrink-0">
-                        {userInitial}
-                    </div>
-                    <div className="text-left flex-grow truncate">
-                        <p className="text-sm font-semibold truncate text-white">{userName}</p>
-                        <p className="text-xs text-gray-400">View Profile</p>
-                    </div>
-                </button>
-                
-                {/* Collapsible Menu */}
-                {isMenuOpen && (
-                    <div className="absolute bottom-full left-0 w-full mb-2 p-3 bg-gray-700 rounded-xl shadow-2xl z-10 origin-bottom animate-slideUp">
-                        <UserMenuItem icon={User} label="View Profile" action="profile" />
-                        <UserMenuItem icon={KeyRound} label="Change Password" action="password" />
-                        <div className="my-2 border-t border-gray-600"></div>
-                        <UserMenuItem icon={LogOut} label="Log Out" action="logout" />
-                    </div>
-                )}
-
-                {/* Authenticated User ID - Mandatory Full Display */}
-                <div className="mt-4 pt-2 border-t border-gray-800">
-                    <p className="text-xs font-medium text-gray-400 mb-1">Authenticated User ID:</p>
-                    <p className="text-xs text-indigo-300 break-all">{userId || 'Loading...'}</p>
-                </div>
-
-            </div>
+    <!-- Main Content Wrapper to offset fixed sidebar -->
+    <main class="flex-grow p-8 overflow-y-auto ml-64 min-h-screen">
+        <div id="main-content">
+            <!-- Content will be rendered by renderMainContent() -->
         </div>
-    );
-};
-
-
-export default function App() {
-    const [currentPage, setCurrentPage] = useState('dashboard');
-    // New state to manage the workflow tab (Production or QC) within Assembly/Pattern
-    const [currentWorkflow, setCurrentWorkflow] = useState('production'); 
-    const { userId, isAuthReady, auth } = useFirebase();
-
-    const renderContent = () => {
-        if (!isAuthReady) {
-            return (
-                <div className="flex items-center justify-center h-full w-full">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mr-2" />
-                    <span className="text-gray-600 font-medium">Loading User Session...</span>
-                </div>
-            );
-        }
-
-        switch (currentPage) {
-            case 'dashboard':
-                return <Dashboard />;
-            case 'assembly':
-                return (
-                    <ModuleContainer
-                        moduleName="Assembly"
-                        currentWorkflow={currentWorkflow}
-                        setCurrentWorkflow={setCurrentWorkflow}
-                    />
-                );
-            case 'pattern':
-                return (
-                    <ModuleContainer
-                        moduleName="Pattern"
-                        currentWorkflow={currentWorkflow}
-                        setCurrentWorkflow={setCurrentWorkflow}
-                    />
-                );
-            default:
-                return <Dashboard />;
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-50 flex font-sans">
-            <style>{`
-                /* Simple Tailwind-friendly animation for the menu */
-                @keyframes slideUp {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-slideUp {
-                    animation: slideUp 0.15s ease-out forwards;
-                }
-            `}</style>
-            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userId={userId} auth={auth} />
-            <main className="flex-grow p-8 overflow-y-auto">
-                {renderContent()}
-            </main>
-        </div>
-    );
-}
+    </main>
+</body>
+</html>
