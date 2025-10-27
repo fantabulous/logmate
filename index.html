@@ -76,9 +76,11 @@
         }
         .sidebar.collapsed { width: 60px; }
         
+        /* Neterwala Logo and Text Section */
         .logo-section {
             display: flex;
             align-items: center;
+            flex-direction: column; /* Stack logo and text */
             padding: 0 15px 25px 15px; 
             font-size: 1.8em; 
             font-weight: 900;
@@ -86,9 +88,24 @@
             margin-bottom: 20px;
             color: #d1d5db; 
         }
-        .logo-icon { font-size: 32px; margin-right: 10px; min-width: 30px; text-align: center; color: #38bdf8; }
+        
+        .neterwala-logo-img {
+            max-width: 150px; /* Full size for expanded state */
+            height: auto;
+            margin: 0 auto 5px auto;
+            display: block;
+            filter: brightness(0) invert(1); /* Invert colors for dark background */
+            transition: max-width 0.3s ease-in-out;
+        }
+
+        .sidebar.collapsed .neterwala-logo-img {
+            max-width: 40px; /* Smaller size for collapsed state */
+            margin: 0 auto;
+        }
+
         .logo-text { opacity: 1; transition: opacity 0.3s ease-in-out; white-space: nowrap; }
-        .sidebar.collapsed .logo-text { opacity: 0; width: 0; }
+        .sidebar.collapsed .logo-text { opacity: 0; width: 0; font-size: 0; }
+        .sidebar.collapsed .logo-icon { margin-right: 0; } /* Removed logo-icon element */
 
         .menu-item {
             display: flex;
@@ -302,6 +319,36 @@
         .animate-spin-slow {
             animation: spin 3s linear infinite;
         }
+        
+        /* DronaHQ Footer Styling */
+        .dronahq-footer {
+            margin-top: auto; /* Pushes the footer to the bottom */
+            padding: 10px 15px;
+            text-align: center;
+            font-size: 0.75rem; /* text-xs */
+            color: #6b7280; /* gray-400 */
+            border-top: 1px solid #374151;
+            white-space: nowrap;
+            transition: opacity 0.3s;
+        }
+        .sidebar.collapsed .dronahq-footer {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+            padding: 0;
+            height: 0;
+        }
+        
+        /* Login Logo Styling */
+        .login-logo {
+            margin-bottom: 10px;
+            display: block;
+            text-align: center;
+        }
+        .login-logo img {
+            max-height: 50px; /* Adjust height for visibility */
+            width: auto;
+        }
     </style>
     <!-- Font Awesome for Icons (using the official CDN link) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -311,7 +358,13 @@
     <!-- LOGIN SCREEN -->
     <div id="login-screen">
         <div class="login-card">
-            <h2 class="text-3xl font-extrabold text-gray-900 text-center mb-2">LogMate</h2>
+            
+            <!-- Neterwala Logo Added to Login Card -->
+            <div class="login-logo">
+                <img src="https://neterwala.com/img/logo2-1.png" alt="Neterwala Logo" class="mx-auto">
+            </div>
+            
+            <h2 class="text-3xl font-extrabold text-gray-900 text-center mb-6">LogMate</h2>
             
             <form id="login-form">
                 <div class="mb-4">
@@ -336,7 +389,7 @@
             <div class="sidebar" id="sidebar">
                 <div class="sidebar-content flex-grow">
                     <div class="logo-section">
-                        <span class="logo-icon"><i class="fas fa-cubes"></i></span>
+                        <img src="https://neterwala.com/img/logo2-1.png" alt="Neterwala Logo" class="neterwala-logo-img">
                         <span class="logo-text">LogMate</span>
                     </div>
 
@@ -387,6 +440,11 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- DronaHQ Footer -->
+                <div class="dronahq-footer">
+                    Powered by DronaHQ
+                </div>
             </div>
 
             <!-- Main Content Area -->
@@ -397,8 +455,8 @@
                 <div id="main-header" class="main-header">
                     <div class="relative inline-block text-left">
                         <button id="profile-toggle" class="profile-toggle" type="button">
-                            <div class="user-avatar-small">JD</div>
-                            <span class="user-name-header">Jane Doe</span>
+                            <div class="user-avatar-small">AV</div>
+                            <span class="user-name-header">Aman Verma</span>
                             <i class="fas fa-angle-down text-gray-400 text-sm ml-2" id="profile-arrow"></i>
                         </button>
                         <div id="profile-dropdown" class="profile-dropdown hidden">
@@ -477,7 +535,7 @@
             document.getElementById('login-screen').classList.add('hidden-app');
             document.getElementById('app-screen').classList.remove('hidden-app');
             loadModule('dashboard'); 
-            showMessage('Welcome back, Jane Doe! Ready to log production.', false);
+            showMessage('Welcome back, Aman Verma! Ready to log production.', false);
             // Hide dropdown after login transition
             document.getElementById('profile-dropdown').classList.add('hidden');
         }
