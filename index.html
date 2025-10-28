@@ -349,6 +349,38 @@
             max-height: 50px; /* Adjust height for visibility */
             width: auto;
         }
+
+        /* Table Specific Styling for Actions */
+        .action-btn-release {
+            color: #f59e0b;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.1s;
+        }
+        .action-btn-release:hover {
+            background-color: #fffbeb;
+        }
+        .action-btn-update {
+            color: #3b82f6;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.1s;
+        }
+        .action-btn-update:hover {
+            background-color: #eff6ff;
+        }
+        .action-btn-confirm {
+             color: #0ea5e9;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.1s;
+        }
+        .action-btn-confirm:hover {
+            background-color: #f0f9ff;
+        }
     </style>
     <!-- Font Awesome for Icons (using the official CDN link) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -410,13 +442,17 @@
                             <span class="ml-auto text-sm opacity-60"><i class="fas fa-angle-down"></i></span>
                         </a>
                         <div class="submenu" id="submenu-assembly">
-                            <a href="#" class="menu-item submenu-item" data-module="assembly-order">
+                            <a href="#" class="menu-item submenu-item" data-module="assembly-release">
+                                <span class="menu-icon"><i class="fas fa-calendar-plus"></i></span>
+                                <span class="menu-item-text">Order Release</span>
+                            </a>
+                            <a href="#" class="menu-item submenu-item" data-module="assembly-confirmation">
                                 <span class="menu-icon"><i class="fas fa-calendar-check"></i></span>
-                                <span class="menu-item-text">Assembly Order</span>
+                                <span class="menu-item-text">Order Confirmation</span>
                             </a>
                             <a href="#" class="menu-item submenu-item" data-module="assembly-qc">
                                 <span class="menu-icon"><i class="fas fa-vial"></i></span>
-                                <span class="menu-item-text">Assembly QC</span>
+                                <span class="menu-item-text">Quality Control</span>
                             </a>
                         </div>
                     </div>
@@ -429,13 +465,17 @@
                             <span class="ml-auto text-sm opacity-60"><i class="fas fa-angle-down"></i></span>
                         </a>
                         <div class="submenu" id="submenu-pattern">
-                            <a href="#" class="menu-item submenu-item" data-module="pattern-order">
+                            <a href="#" class="menu-item submenu-item" data-module="pattern-release">
+                                <span class="menu-icon"><i class="fas fa-calendar-plus"></i></span>
+                                <span class="menu-item-text">Order Release</span>
+                            </a>
+                            <a href="#" class="menu-item submenu-item" data-module="pattern-confirmation">
                                 <span class="menu-icon"><i class="fas fa-calendar-check"></i></span>
-                                <span class="menu-item-text">Pattern Order</span>
+                            <span class="menu-item-text">Order Confirmation</span>
                             </a>
                             <a href="#" class="menu-item submenu-item" data-module="pattern-qc">
                                 <span class="menu-icon"><i class="fas fa-vial"></i></span>
-                                <span class="menu-item-text">Pattern QC</span>
+                                <span class="menu-item-text">Quality Control</span>
                             </a>
                         </div>
                     </div>
@@ -549,10 +589,21 @@
             document.getElementById('profile-arrow').classList.replace('fa-angle-up', 'fa-angle-down');
         }
 
-        // --- MODULE CONTENT & LOADERS ---
+        // --- MOCK DATA ---
+        let assemblyOrders = [
+            { id: 'PO-1001', material: 'MAT001', targetQty: 500, status: 'Created', releaseId: 'N/A', confirmed: false },
+            { id: 'PO-1002', material: 'MAT002', targetQty: 250, status: 'Released', releaseId: 'RO-1002', confirmed: false },
+            { id: 'PO-1003', material: 'MAT001', targetQty: 750, status: 'Released', releaseId: 'RO-1003', confirmed: true },
+            { id: 'PO-1004', material: 'MAT003', targetQty: 100, status: 'Created', releaseId: 'N/A', confirmed: false },
+        ];
+        
+        let patternOrders = [
+            { id: 'PO-2001', material: 'MAT004', targetQty: 300, status: 'Created', releaseId: 'N/A', confirmed: false },
+            { id: 'PO-2002', material: 'MAT001', targetQty: 400, status: 'Released', releaseId: 'RO-2002', confirmed: false },
+            { id: 'PO-2003', material: 'MAT004', targetQty: 150, status: 'Released', releaseId: 'RO-2003', confirmed: true },
+        ];
 
-        let moduleContents = {}; // Defined inside DOMContentLoaded for scope access
-
+        // --- CORE LOGIC (Load Module) ---
 
         function loadModule(moduleName) {
             const appContent = document.getElementById('app-content');
@@ -583,27 +634,26 @@
             
             // --- Attach Module-Specific Event Listeners ---
             
-            // 1. Assembly Order Initialization & Submission
-            if (moduleName === 'assembly-order') {
-                const postDateInputA = document.getElementById('postDate');
-                if (postDateInputA) {
-                    postDateInputA.value = getCurrentDateString();
-                }
-                
-                const formA = document.getElementById('orderConfirmationForm');
-                if (formA) {
-                    formA.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        showMessage('Assembly Order Confirmed Successfully!', false);
-                        formA.reset();
-                        document.getElementById('materialCode').value = "MAT001";
-                        document.getElementById('releaseOrder').value = "RO1001";
-                        document.getElementById('postDate').value = getCurrentDateString();
-                    });
-                }
+            const currentDate = getCurrentDateString();
+
+            // 1. Assembly Order Management (Release/Confirmation)
+            if (moduleName === 'assembly-release') {
+                renderOrderRelease('Assembly', assemblyOrders);
+            }
+            if (moduleName === 'assembly-confirmation') {
+                renderOrderConfirmation('Assembly', 'RO1001', 'orderConfirmationFormA');
+            }
+            
+            // 2. Pattern Order Management (Release/Confirmation)
+            if (moduleName === 'pattern-release') {
+                renderOrderRelease('Pattern', patternOrders);
+            }
+            if (moduleName === 'pattern-confirmation') {
+                renderOrderConfirmation('Pattern', 'RO2001', 'orderConfirmationFormP');
             }
 
-            // 2. Assembly QC Submission
+
+            // 3. Assembly QC Submission
             if (moduleName === 'assembly-qc') {
                 const formQCA = document.getElementById('qcFormAssembly');
                 if (formQCA) {
@@ -617,26 +667,6 @@
                 }
             }
             
-            // 3. Pattern Order Initialization & Submission
-            if (moduleName === 'pattern-order') {
-                const postDateInputP = document.getElementById('postDateP');
-                if (postDateInputP) {
-                    postDateInputP.value = getCurrentDateString();
-                }
-                
-                const formP = document.getElementById('orderConfirmationFormPattern');
-                if (formP) {
-                    formP.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        showMessage('Pattern Order Confirmed Successfully!', false);
-                        formP.reset();
-                        document.getElementById('materialCodeP').value = "MAT001";
-                        document.getElementById('releaseOrderP').value = "RO2001";
-                        document.getElementById('postDateP').value = getCurrentDateString();
-                    });
-                }
-            }
-
             // 4. Pattern QC Submission
             if (moduleName === 'pattern-qc') {
                 const formQCP = document.getElementById('qcFormPattern');
@@ -650,7 +680,6 @@
                     });
                 }
             }
-
 
             // 5. Production Status Check
             if (moduleName === 'production-status') {
@@ -682,6 +711,509 @@
                 }
             }
         }
+        
+        // --- RENDERING FUNCTIONS ---
+
+        function renderOrderRelease(process, orderData) {
+            const tableBodyId = `orderTableBody${process.replace(' ', '')}`;
+            const tableBody = document.getElementById(tableBodyId);
+            if (!tableBody) return; // Exit if the element is not yet in the DOM
+
+            const tableHtml = orderData.map(order => {
+                let statusBadge, actionButtons;
+                let isConfirmed = order.confirmed;
+
+                if (order.status === 'Created') {
+                    statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">${order.status}</span>`;
+                    actionButtons = `
+                        <button onclick="handleOrderAction('${order.id}', 'update', '${process}')" class="action-btn-update mr-3"><i class="fas fa-edit mr-1"></i> Update QTY</button>
+                        <button onclick="handleOrderAction('${order.id}', 'release', '${process}')" class="action-btn-release"><i class="fas fa-share-square mr-1"></i> Release Order</button>
+                    `;
+                } else if (order.status === 'Released' && !isConfirmed) {
+                    statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-sky-100 text-sky-800">${order.status}</span>`;
+                    actionButtons = `
+                        <button onclick="navigateToModule('${process.toLowerCase()}-confirmation')" class="action-btn-confirm"><i class="fas fa-calendar-check mr-1"></i> Confirm Order</button>
+                    `;
+                } else if (isConfirmed) {
+                    statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Confirmed</span>`;
+                    actionButtons = `<span class="text-gray-400 text-xs">Complete</span>`;
+                }
+
+                return `
+                    <tr class="hover:bg-gray-50 transition duration-150" data-order-id="${order.id}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${order.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.material}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.targetQty}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${actionButtons}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tableBody.innerHTML = tableHtml;
+        }
+
+        function renderOrderConfirmation(process, defaultReleaseId, formId) {
+            const formElement = document.getElementById(formId);
+            
+            // 1. Setup Confirmation Form Defaults
+            const postDateInput = document.getElementById(`postDate${process[0]}`);
+            if (postDateInput) postDateInput.value = getCurrentDateString();
+
+            // 2. Setup Form Submission Listener
+            if (formElement) {
+                formElement.removeEventListener('submit', handleFormSubmission);
+                formElement.addEventListener('submit', handleFormSubmission);
+            }
+        }
+
+
+        // --- ACTION HANDLERS ---
+
+        function handleOrderAction(orderId, actionType, process) {
+            let orderList = process === 'Assembly' ? assemblyOrders : patternOrders;
+            const order = orderList.find(o => o.id === orderId);
+            
+            if (!order) return showMessage('Order not found.', true);
+
+            switch(actionType) {
+                case 'update':
+                    showMessage(`Editing Target QTY for Order ${orderId}. (Functionality not implemented)`, false);
+                    break;
+                case 'release':
+                    order.status = 'Released';
+                    order.releaseId = `RO-${Math.floor(Math.random() * 9000) + 1000}`; // Mock Release ID
+                    showMessage(`Order ${orderId} released successfully! Release ID: ${order.releaseId}`, false);
+                    renderOrderRelease(process, orderList); // Re-render table
+                    break;
+                case 'confirm':
+                    // Navigate directly to the confirmation form
+                    navigateToModule(`${process.toLowerCase()}-confirmation`);
+                    break;
+                default:
+                    showMessage('Unknown action.', true);
+            }
+        }
+
+        function handleFormSubmission(e) {
+            e.preventDefault();
+            const formId = e.target.id;
+            const process = formId.includes('A') ? 'Assembly' : 'Pattern';
+            const releaseId = document.getElementById(`releaseOrder${process[0]}`).value;
+
+            // Mock updating the status in the data array
+            let orderList = process === 'Assembly' ? assemblyOrders : patternOrders;
+            const orderToConfirm = orderList.find(o => o.releaseId === releaseId);
+            if (orderToConfirm) {
+                orderToConfirm.confirmed = true;
+                orderToConfirm.status = 'Released'; 
+            }
+
+            showMessage(`${process} Order Confirmed Successfully!`, false);
+            
+            // Reset form
+            e.target.reset();
+            document.getElementById(`materialCode${process[0]}`).value = "MAT001";
+            document.getElementById(`releaseOrder${process[0]}`).value = releaseId; 
+            document.getElementById(`postDate${process[0]}`).value = getCurrentDateString();
+        }
+
+        // --- MODULE CONTENT DEFINITIONS ---
+        
+        const dashboardContent = `
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">Operations Dashboard 📈</h1>
+            <p class="text-gray-500 mb-8 text-xl">Real-time overview of production and quality control performance. <span class="font-semibold text-indigo-500">MIS & Key Stats below.</span></p>
+            
+            <!-- ROW 1: CORE PRODUCTION & QC METRICS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                
+                <!-- 1. Production Yield (CTA to Assembly Order) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-sky-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-release')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Production Yield (Assembly)</h2>
+                        <i class="fas fa-chart-line text-2xl text-sky-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-sky-700 mb-2">95.3%</div>
+                    <p class="text-sm text-gray-500 mb-3">Accepted QTY vs Rejected QTY Last Week</p>
+                    
+                    <div class="h-16 flex items-end space-x-1 mb-3">
+                        <div class="w-1/4 h-4 bg-gray-300 rounded-sm" style="height: 30%;"></div>
+                        <div class="w-1/4 h-4 bg-sky-500 rounded-sm" style="height: 80%;"></div>
+                        <div class="w-1/4 h-4 bg-sky-500 rounded-sm" style="height: 65%;"></div>
+                        <div class="w-1/4 h-4 bg-gray-300 rounded-sm" style="height: 40%;"></div>
+                    </div>
+
+                    <button class="w-full mt-3 bg-sky-100 text-sky-600 font-semibold py-2 rounded-lg hover:bg-sky-200 transition">
+                        View Assembly Orders <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 2. QC Status (CTA to Assembly QC) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-emerald-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-qc')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">QC Status (Open Lots)</h2>
+                        <i class="fas fa-check-double text-2xl text-emerald-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-emerald-700 mb-2">8 Open Lots</div>
+                    <p class="text-sm text-gray-500 mb-3">Awaiting Usage Decision (Assembly & Pattern)</p>
+
+                    <div class="h-16 flex items-center justify-center mb-3 relative">
+                        <div class="w-12 h-12 rounded-full border-4 border-emerald-500 border-r-transparent animate-spin-slow"></div>
+                        <span class="absolute text-emerald-600 font-bold text-xl">8</span>
+                    </div>
+                    
+                    <button class="w-full mt-3 bg-emerald-100 text-emerald-600 font-semibold py-2 rounded-lg hover:bg-emerald-200 transition">
+                        View Assembly QC Lots <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 3. Open Orders (CTA to Pattern Order) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-indigo-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-release')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Open Orders (Pattern)</h2>
+                        <i class="fas fa-layer-group text-2xl text-indigo-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-indigo-700 mb-2">24 Orders</div>
+                    <p class="text-sm text-gray-500 mb-3">Total Orders awaiting Confirmation in Pattern</p>
+
+                    <div class="h-16 flex items-end justify-between space-x-1 mb-3 text-xs font-semibold text-white">
+                        <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 75%;"></div>
+                        <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 95%;"></div>
+                        <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 50%;"></div>
+                        <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 30%;"></div>
+                    </div>
+
+                    <button class="w-full mt-3 bg-indigo-100 text-indigo-600 font-semibold py-2 rounded-lg hover:bg-indigo-200 transition">
+                        View Pattern Orders <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 4. Defects Overview (CTA to Pattern QC) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-red-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-qc')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Defects Trend</h2>
+                        <i class="fas fa-bug text-2xl text-red-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-red-700 mb-2">Trend: +4.2%</div>
+                    <p class="text-sm text-gray-500 mb-3">Week-over-Week increase in Not OK QTY</p>
+
+                    <div class="h-16 relative mb-3">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <polyline fill="#fca5a5" stroke="none" points="0,90 20,60 40,75 60,40 80,55 100,20 100,100 0,100" />
+                            <polyline fill="none" stroke="#dc2626" stroke-width="3" points="0,90 20,60 40,75 60,40 80,55 100,20" />
+                        </svg>
+                    </div>
+
+                    <button class="w-full mt-3 bg-red-100 text-red-600 font-semibold py-2 rounded-lg hover:bg-red-200 transition">
+                        Review Pattern QC Defects <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ROW 2: MIS AND STATS CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <!-- 5. MIS: Inspection Compliance (CTA to Production Status) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-green-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('production-status')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Inspection Compliance</h2>
+                        <i class="fas fa-file-invoice text-2xl text-green-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-green-700 mb-2">98%</div>
+                    <p class="text-sm text-gray-500 mb-3">Percentage of Lots with recorded QC Results</p>
+                    
+                    <div class="w-full bg-gray-200 rounded-full h-4 mb-3">
+                        <div class="bg-green-500 h-4 rounded-full" style="width: 98%"></div>
+                    </div>
+
+                    <button class="w-full mt-3 bg-green-100 text-green-600 font-semibold py-2 rounded-lg hover:bg-green-200 transition">
+                        Check Material Status <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 6. STATS: Average Lead Time -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-yellow-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="showMessage('This metric is for high-level review only.', false)">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Avg. Order Lead Time</h2>
+                        <i class="fas fa-clock text-2xl text-yellow-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-yellow-700 mb-2">1.5 Days</div>
+                    <p class="text-sm text-gray-500 mb-3">From Release to Final Confirmation (Average)</p>
+
+                    <div class="h-16 relative mb-3">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <polyline fill="#fcd34d" stroke="none" points="0,70 20,80 40,65 60,75 80,60 100,50 100,100 0,100" />
+                            <polyline fill="none" stroke="#f59e0b" stroke-width="3" points="0,70 20,80 40,65 60,75 80,60 100,50" />
+                        </svg>
+                    </div>
+                    
+                    <button class="w-full mt-3 bg-yellow-100 text-yellow-600 font-semibold py-2 rounded-lg hover:bg-yellow-200 transition">
+                        View Historical Trends <i class="fas fa-chart-area ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 7. MIS: Total Order Volume (CTA to Assembly Order) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-purple-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-release')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Total Order Volume</h2>
+                        <i class="fas fa-box-open text-2xl text-purple-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-purple-700 mb-2">1,250 QTY</div>
+                    <p class="text-sm text-gray-500 mb-3">Total quantity processed across all modules this month</p>
+                    
+                    <div class="h-16 flex items-end space-x-1 mb-3">
+                        <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 50%;"></div>
+                        <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 90%;"></div>
+                        <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 70%;"></div>
+                        <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 60%;"></div>
+                    </div>
+
+                    <button class="w-full mt-3 bg-purple-100 text-purple-600 font-semibold py-2 rounded-lg hover:bg-purple-200 transition">
+                        Process Next Order <i class="fas fa-plus ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 8. STATS: Batch Traceability (CTA to Pattern QC) -->
+                <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-blue-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-qc')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-gray-700">Batch Traceability</h2>
+                        <i class="fas fa-fingerprint text-2xl text-blue-500"></i>
+                    </div>
+                    <div class="text-3xl font-extrabold text-blue-700 mb-2">99.5%</div>
+                    <p class="text-sm text-gray-500 mb-3">Completion rate for final batch disposition/UD</p>
+
+                    <div class="h-16 flex items-center justify-center mb-3">
+                        <div class="w-16 h-16 rounded-full border-4 border-blue-200 relative">
+                            <div class="w-16 h-16 rounded-full border-4 border-blue-500 border-t-transparent absolute top-0 left-0" style="transform: rotate(270deg);"></div>
+                            <span class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-lg">UD</span>
+                        </div>
+                    </div>
+
+                    <button class="w-full mt-3 bg-blue-100 text-blue-600 font-semibold py-2 rounded-lg hover:bg-blue-200 transition">
+                        Review UD History <i class="fas fa-history ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Production Status Module
+        const productionStatusContent = `
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">Production Status 🏭</h1>
+            <div class="card bg-white p-6 rounded-xl shadow-xl max-w-2xl border-l-4 border-cyan-500">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-6 border-b pb-2">Material & System Status</h2>
+                <div class="mb-8">
+                    <label class="block text-gray-700 font-medium mb-2">System Status Switch</label>
+                    <div class="flex items-center space-x-6 bg-gray-50 p-4 rounded-lg">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="prod-status" value="on" checked class="form-radio h-5 w-5 text-indigo-600">
+                            <span class="ml-3 font-medium text-gray-800">Production ON</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="prod-status" value="exclude" class="form-radio h-5 w-5 text-red-600">
+                            <span class="ml-3 font-medium text-gray-800">Exclude Option</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Material Code Status Check</h2>
+                    <div class="flex space-x-3">
+                        <input type="text" id="status-materialCode" placeholder="Enter Material Code (e.g. MAT001)" class="p-3 border border-gray-300 rounded-lg flex-grow focus:ring-cyan-500 focus:border-cyan-500">
+                        <button id="checkStatusBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition duration-150 shadow-md transform hover:scale-[1.01]"><i class="fas fa-search mr-2"></i> Check STATUS</button>
+                    </div>
+                    <p class="mt-4 text-gray-600 text-lg">
+                        Current STATUS: <strong id="material-status" class="text-green-600 font-bold">READY</strong>
+                    </p>
+                </div>
+            </div>
+        `;
+
+        // --- ORDER RELEASE TEMPLATE (Assembly and Pattern) ---
+        const orderReleaseTemplate = (process) => `
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">${process} Order Release <i class="fas fa-calendar-plus text-amber-500"></i></h1>
+            
+            <!-- 1. ORDER LISTING & ACTIONS -->
+            <div class="card bg-white p-6 rounded-xl shadow-xl mb-8 border-l-4 border-amber-500">
+                <div class="flex justify-between items-center mb-4 border-b pb-4">
+                    <h2 class="text-2xl font-semibold text-gray-700">Order Release Control</h2>
+                    <button onclick="navigateToModule('${process.toLowerCase()}-confirmation')" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md transform hover:scale-[1.01]"><i class="fas fa-calendar-check mr-2"></i> Confirm Order</button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-1">Status Filter</label>
+                        <select class="w-full p-3 border rounded-lg focus:ring-amber-500 focus:border-amber-500">
+                            <option>All</option>
+                            <option>Created</option>
+                            <option>Released (Pending Conf.)</option>
+                            <option>Confirmed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-1">Material Code</label>
+                        <input type="text" placeholder="E.g., MAT001" class="w-full p-3 border rounded-lg focus:ring-amber-500 focus:border-amber-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button class="bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg w-full hover:bg-gray-300 transition"><i class="fas fa-filter mr-2"></i> Apply Filters</button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target QTY</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderTableBody${process.replace(' ', '')}" class="bg-white divide-y divide-gray-200">
+                            <!-- Order rows injected by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+
+        // --- ORDER CONFIRMATION TEMPLATE (Assembly and Pattern) ---
+        const orderConfirmationTemplate = (process, defaultReleaseId, formId) => `
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">${process} Order Confirmation <i class="fas fa-calendar-check text-sky-500"></i></h1>
+            
+            <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-sky-500 max-w-4xl mx-auto">
+                <div class="flex justify-between items-center mb-4 border-b pb-4">
+                    <h2 class="text-2xl font-semibold text-gray-700">Yield & Confirmation Data Entry</h2>
+                    <button onclick="navigateToModule('${process.toLowerCase()}-release')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition duration-150"><i class="fas fa-undo mr-2"></i> Back to Order List</button>
+                </div>
+                
+                <p class="text-gray-500 mb-6">Enter yield data and confirm the selected Released Order (e.g., ${defaultReleaseId}).</p>
+                
+                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 mb-8">
+                    <div class="md:col-span-1">
+                        <label for="materialCode${process[0]}" class="block text-gray-700 font-medium mb-1">Select Material Code</label>
+                        <select id="materialCode${process[0]}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                            <option value="">Select Material...</option>
+                            <option value="MAT001" selected>MAT001 - Component A</option>
+                            <option value="MAT002">MAT002 - Component B</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="releaseOrder${process[0]}" class="block text-gray-700 font-medium mb-1">Release Order ID</label>
+                        <select id="releaseOrder${process[0]}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                            <option value="">Select Order...</option>
+                            <option value="${defaultReleaseId}" selected>${defaultReleaseId}</option>
+                            <option value="RO9999">RO9999</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="postDate${process[0]}" class="block text-gray-700 font-medium mb-1">POSTING DATE</label>
+                        <input type="date" id="postDate${process[0]}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    
+                    <div class="md:col-span-1">
+                        <label for="yield${process[0]}" class="block text-gray-700 font-medium mb-1">Enter the Yield (Total Produced)</label>
+                        <input type="number" id="yield${process[0]}" required placeholder="Total Quantity Produced" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="acceptedQty${process[0]}" class="block text-gray-700 font-medium mb-1">Accepted QTY</label>
+                        <input type="number" id="acceptedQty${process[0]}" required placeholder="Quantity passing inspection" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="rejectedQty${process[0]}" class="block text-gray-700 font-medium mb-1">Rejected QTY</label>
+                        <input type="number" id="rejectedQty${process[0]}" required placeholder="Quantity rejected" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    
+                    <div class="md:col-span-3 mt-6 text-right">
+                        <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-check-circle mr-2"></i> Confirm Order</button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+
+        // --- QC MODULE TEMPLATE (Assembly and Pattern) ---
+        const qcContentTemplate = (process, defaultLot) => `
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">${process} Quality Control (QC) ✅</h1>
+            <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-indigo-500">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Inspection Result & Usage Decision (UD)</h2>
+                <p class="text-gray-500 mb-6">Record inspection details, quantity breakdown, and final usage decision for ${process} outputs.</p>
+
+                <form id="qcForm${process.replace(' ', '')}" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left Column: Inspection Details -->
+                    <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
+                        <h3 class="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">Inspection Details</h3>
+                        <div><label class="block text-gray-700 font-medium mb-1">Material:</label>
+                            <select id="qcMaterialCode${process[0]}" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="MAT001" selected>MAT001 (${process})</option>
+                                <option value="MAT003">MAT003</option>
+                            </select>
+                        </div>
+                        <div><label class="block text-gray-700 font-medium mb-1">Inspection Status:</label>
+                            <select id="inspectionStatus${process[0]}" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="in_process" selected>In Process</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+                        <div><label class="block text-gray-700 font-medium mb-1">Inspection Lot:</label>
+                            <select id="inspectionLot${process[0]}" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="${defaultLot}" selected>Lot ${defaultLot}</option>
+                                <option value="Lot_4568">Lot 4568</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Middle Column: QTY Breakdown -->
+                    <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
+                        <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Quantity Result</h3>
+                        <div><label for="inspectedQty${process[0]}" class="block text-gray-700 font-medium mb-1">Inspected QTY (Total)</label>
+                            <input type="number" id="inspectedQty${process[0]}" required placeholder="Total inspected" class="w-full p-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div><label for="okQty${process[0]}" class="block text-gray-700 font-medium mb-1">OK QTY (Pass)</label>
+                            <input type="number" id="okQty${process[0]}" required placeholder="Quantity passed" value="0" class="w-full p-3 border rounded-lg border-green-400 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div><label for="notOkQty${process[0]}" class="block text-gray-700 font-medium mb-1">Not OK QTY (Fail)</label>
+                            <input type="number" id="notOkQty${process[0]}" required placeholder="Quantity failed" value="0" class="w-full p-3 border rounded-lg border-red-400 focus:ring-red-500 focus:border-red-500">
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Usage Decision -->
+                    <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
+                        <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Usage Decision (UD)</h3>
+                        <div><label for="defectsCode${process[0]}" class="block text-gray-700 font-medium mb-1">Defects Code QTY Wise</label>
+                            <textarea id="defectsCode${process[0]}" rows="4" placeholder="e.g., C-101: 5pcs, C-205: 2pcs" class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500"></textarea>
+                        </div>
+                        <div><label for="usageDecision${process[0]}" class="block text-gray-700 font-medium mb-1">Usgae Decision</label>
+                            <select id="usageDecision${process[0]}" required class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
+                                <option value="" selected>Select Decision</option>
+                                <option value="accept">Accept</option>
+                                <option value="reject">Reject</option>
+                                <option value="rework">Rework</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-3 mt-6 text-right">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-save mr-2"></i> DONE & Save QC</button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        moduleContents = {
+            'dashboard': dashboardContent,
+            'production-status': productionStatusContent,
+            'assembly-release': orderReleaseTemplate('Assembly'),
+            'assembly-confirmation': orderConfirmationTemplate('Assembly', 'RO1001', 'orderConfirmationFormA'),
+            'assembly-qc': qcContentTemplate('Assembly', '4567'),
+            'pattern-release': orderReleaseTemplate('Pattern'),
+            'pattern-confirmation': orderConfirmationTemplate('Pattern', 'RO2001', 'orderConfirmationFormP'),
+            'pattern-qc': qcContentTemplate('Pattern', '5001'),
+        };
+
+
+        // --- EVENT LISTENERS INITIALIZATION ---
 
         document.addEventListener('DOMContentLoaded', () => {
             const sidebar = document.getElementById('sidebar');
@@ -695,488 +1227,6 @@
             const profileArrow = document.getElementById('profile-arrow');
             const mainHeader = document.getElementById('main-header');
 
-
-            // --- MODULE CONTENT DEFINITIONS (Kept inside for DOM access consistency) ---
-            
-            // Dashboard Module (Updated with simulated charts and CTAs + MIS/Stats cards)
-            const dashboardContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Operations Dashboard 📈</h1>
-                <p class="text-gray-500 mb-8 text-xl">Real-time overview of production and quality control performance. <span class="font-semibold text-indigo-500">MIS & Key Stats below.</span></p>
-                
-                <!-- ROW 1: CORE PRODUCTION & QC METRICS -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    
-                    <!-- 1. Production Yield (CTA to Assembly Order) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-sky-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-order')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Production Yield (Assembly)</h2>
-                            <i class="fas fa-chart-line text-2xl text-sky-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-sky-700 mb-2">95.3%</div>
-                        <p class="text-sm text-gray-500 mb-3">Accepted QTY vs Rejected QTY Last Week</p>
-                        
-                        <!-- Simulated Bar Chart -->
-                        <div class="h-16 flex items-end space-x-1 mb-3">
-                            <div class="w-1/4 h-4 bg-gray-300 rounded-sm" style="height: 30%;"></div>
-                            <div class="w-1/4 h-4 bg-sky-500 rounded-sm" style="height: 80%;"></div>
-                            <div class="w-1/4 h-4 bg-sky-500 rounded-sm" style="height: 65%;"></div>
-                            <div class="w-1/4 h-4 bg-gray-300 rounded-sm" style="height: 40%;"></div>
-                        </div>
-
-                        <button class="w-full mt-3 bg-sky-100 text-sky-600 font-semibold py-2 rounded-lg hover:bg-sky-200 transition">
-                            Confirm Assembly Yield & QTY <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 2. QC Status (CTA to Assembly QC) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-emerald-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-qc')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">QC Status (Open Lots)</h2>
-                            <i class="fas fa-check-double text-2xl text-emerald-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-emerald-700 mb-2">8 Open Lots</div>
-                        <p class="text-sm text-gray-500 mb-3">Awaiting Usage Decision (Assembly & Pattern)</p>
-
-                        <!-- Simulated Pie Chart/Donut -->
-                        <div class="h-16 flex items-center justify-center mb-3 relative">
-                            <div class="w-12 h-12 rounded-full border-4 border-emerald-500 border-r-transparent animate-spin-slow"></div>
-                            <span class="absolute text-emerald-600 font-bold text-xl">8</span>
-                        </div>
-                        
-                        <button class="w-full mt-3 bg-emerald-100 text-emerald-600 font-semibold py-2 rounded-lg hover:bg-emerald-200 transition">
-                            View Assembly QC Lots <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 3. Open Orders (CTA to Pattern Order) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-indigo-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-order')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Open Orders (Pattern)</h2>
-                            <i class="fas fa-layer-group text-2xl text-indigo-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-indigo-700 mb-2">24 Orders</div>
-                        <p class="text-sm text-gray-500 mb-3">Total Orders awaiting Confirmation in Pattern</p>
-
-                        <!-- Simulated Bar Chart Stacked -->
-                        <div class="h-16 flex items-end justify-between space-x-1 mb-3 text-xs font-semibold text-white">
-                            <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 75%;"></div>
-                            <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 95%;"></div>
-                            <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 50%;"></div>
-                            <div class="flex flex-col flex-grow h-full bg-indigo-500 rounded-sm justify-end" style="width: 25%; height: 30%;"></div>
-                        </div>
-
-                        <button class="w-full mt-3 bg-indigo-100 text-indigo-600 font-semibold py-2 rounded-lg hover:bg-indigo-200 transition">
-                            Confirm Pattern Orders <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 4. Defects Overview (CTA to Pattern QC) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-red-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-qc')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Defects Trend</h2>
-                            <i class="fas fa-bug text-2xl text-red-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-red-700 mb-2">Trend: +4.2%</div>
-                        <p class="text-sm text-gray-500 mb-3">Week-over-Week increase in Not OK QTY</p>
-
-                        <!-- Simulated Line/Area Chart -->
-                        <div class="h-16 relative mb-3">
-                            <svg viewBox="0 0 100 100" class="w-full h-full">
-                                <polyline fill="#fca5a5" stroke="none" points="0,90 20,60 40,75 60,40 80,55 100,20 100,100 0,100" />
-                                <polyline fill="none" stroke="#dc2626" stroke-width="3" points="0,90 20,60 40,75 60,40 80,55 100,20" />
-                            </svg>
-                        </div>
-
-                        <button class="w-full mt-3 bg-red-100 text-red-600 font-semibold py-2 rounded-lg hover:bg-red-200 transition">
-                            Review Pattern QC Defects <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- ROW 2: MIS AND STATS CARDS -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-                    <!-- 5. MIS: Inspection Compliance (CTA to Production Status) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-green-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('production-status')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Inspection Compliance</h2>
-                            <i class="fas fa-file-invoice text-2xl text-green-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-green-700 mb-2">98%</div>
-                        <p class="text-sm text-gray-500 mb-3">Percentage of Lots with recorded QC Results</p>
-                        
-                        <!-- Simulated Progress Bar -->
-                        <div class="w-full bg-gray-200 rounded-full h-4 mb-3">
-                            <div class="bg-green-500 h-4 rounded-full" style="width: 98%"></div>
-                        </div>
-
-                        <button class="w-full mt-3 bg-green-100 text-green-600 font-semibold py-2 rounded-lg hover:bg-green-200 transition">
-                            Check Material Status <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 6. STATS: Average Lead Time -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-yellow-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="showMessage('This metric is for high-level review only.', false)">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Avg. Order Lead Time</h2>
-                            <i class="fas fa-clock text-2xl text-yellow-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-yellow-700 mb-2">1.5 Days</div>
-                        <p class="text-sm text-gray-500 mb-3">From Release to Final Confirmation (Average)</p>
-
-                        <!-- Simulated Line Chart -->
-                        <div class="h-16 relative mb-3">
-                            <svg viewBox="0 0 100 100" class="w-full h-full">
-                                <polyline fill="#fcd34d" stroke="none" points="0,70 20,80 40,65 60,75 80,60 100,50 100,100 0,100" />
-                                <polyline fill="none" stroke="#f59e0b" stroke-width="3" points="0,70 20,80 40,65 60,75 80,60 100,50" />
-                            </svg>
-                        </div>
-                        
-                        <button class="w-full mt-3 bg-yellow-100 text-yellow-600 font-semibold py-2 rounded-lg hover:bg-yellow-200 transition">
-                            View Historical Trends <i class="fas fa-chart-area ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 7. MIS: Total Order Volume (CTA to Assembly Order) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-purple-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('assembly-order')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Total Order Volume</h2>
-                            <i class="fas fa-box-open text-2xl text-purple-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-purple-700 mb-2">1,250 QTY</div>
-                        <p class="text-sm text-gray-500 mb-3">Total quantity processed across all modules this month</p>
-                        
-                        <!-- Simulated Stacked Bar Chart -->
-                        <div class="h-16 flex items-end space-x-1 mb-3">
-                            <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 50%;"></div>
-                            <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 90%;"></div>
-                            <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 70%;"></div>
-                            <div class="flex flex-col w-1/4 h-4 bg-purple-500 rounded-sm justify-end" style="height: 60%;"></div>
-                        </div>
-
-                        <button class="w-full mt-3 bg-purple-100 text-purple-600 font-semibold py-2 rounded-lg hover:bg-purple-200 transition">
-                            Process Next Order <i class="fas fa-plus ml-2"></i>
-                        </button>
-                    </div>
-
-                    <!-- 8. STATS: Batch Traceability (CTA to Pattern QC) -->
-                    <div class="card bg-white p-5 rounded-xl shadow-xl border-t-4 border-blue-500 transform hover:scale-[1.02] transition duration-300 cursor-pointer" onclick="navigateToModule('pattern-qc')">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-gray-700">Batch Traceability</h2>
-                            <i class="fas fa-fingerprint text-2xl text-blue-500"></i>
-                        </div>
-                        <div class="text-3xl font-extrabold text-blue-700 mb-2">99.5%</div>
-                        <p class="text-sm text-gray-500 mb-3">Completion rate for final batch disposition/UD</p>
-
-                        <!-- Simulated Radar Chart/Gauge -->
-                        <div class="h-16 flex items-center justify-center mb-3">
-                            <div class="w-16 h-16 rounded-full border-4 border-blue-200 relative">
-                                <div class="w-16 h-16 rounded-full border-4 border-blue-500 border-t-transparent absolute top-0 left-0" style="transform: rotate(270deg);"></div>
-                                <span class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-600 font-bold text-lg">UD</span>
-                            </div>
-                        </div>
-
-                        <button class="w-full mt-3 bg-blue-100 text-blue-600 font-semibold py-2 rounded-lg hover:bg-blue-200 transition">
-                            Review UD History <i class="fas fa-history ml-2"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            // Production Status Module
-            const productionStatusContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Production Status 🏭</h1>
-                <div class="card bg-white p-6 rounded-xl shadow-xl max-w-2xl border-l-4 border-cyan-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-6 border-b pb-2">Material & System Status</h2>
-                    <div class="mb-8">
-                        <label class="block text-gray-700 font-medium mb-2">System Status Switch</label>
-                        <div class="flex items-center space-x-6 bg-gray-50 p-4 rounded-lg">
-                            <label class="inline-flex items-center cursor-pointer">
-                                <input type="radio" name="prod-status" value="on" checked class="form-radio h-5 w-5 text-indigo-600">
-                                <span class="ml-3 font-medium text-gray-800">Production ON</span>
-                            </label>
-                            <label class="inline-flex items-center cursor-pointer">
-                                <input type="radio" name="prod-status" value="exclude" class="form-radio h-5 w-5 text-red-600">
-                                <span class="ml-3 font-medium text-gray-800">Exclude Option</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <h2 class="text-xl font-semibold text-gray-700 mb-4">Material Code Status Check</h2>
-                        <div class="flex space-x-3">
-                            <input type="text" id="status-materialCode" placeholder="Enter Material Code (e.g. MAT001)" class="p-3 border border-gray-300 rounded-lg flex-grow focus:ring-cyan-500 focus:border-cyan-500">
-                            <button id="checkStatusBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition duration-150 shadow-md transform hover:scale-[1.01]"><i class="fas fa-search mr-2"></i> Check STATUS</button>
-                        </div>
-                        <p class="mt-4 text-gray-600 text-lg">
-                            Current STATUS: <strong id="material-status" class="text-green-600 font-bold">READY</strong>
-                        </p>
-                    </div>
-                </div>
-            `;
-
-            // --- ASSEMBLY ORDER MODULE (Order Release + Order Confirmation) ---
-            const assemblyOrderContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Assembly Order Confirmation 🛠️</h1>
-                
-                <!-- Order Release Section (Assembly) -->
-                <div class="card bg-white p-6 rounded-xl shadow-xl mb-8 border-l-4 border-amber-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">1. Order Release (Preparation)</h2>
-                    <p class="text-gray-500 mb-4">Manage Created/Released Orders, update Target QTY, and officially Release Orders for the Assembly line.</p>
-                    <button class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md transform hover:scale-[1.01]"><i class="fas fa-list-ol mr-2"></i> View & Release Orders</button>
-                </div>
-
-                <!-- Order Confirmation Section (Assembly) -->
-                <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-sky-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Order Confirmation</h2>
-                    <p class="text-gray-500 mb-6">Enter yield data to confirm the completion of an Assembly Order.</p>
-                    
-                    <form id="orderConfirmationForm" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 mb-8">
-                        <div class="md:col-span-1">
-                            <label for="materialCode" class="block text-gray-700 font-medium mb-1">Select Material Code</label>
-                            <select id="materialCode" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                                <option value="">Select Material...</option>
-                                <option value="MAT001" selected>MAT001 - Component A</option>
-                                <option value="MAT002">MAT002 - Component B</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="releaseOrder" class="block text-gray-700 font-medium mb-1">Select Release Order</label>
-                            <select id="releaseOrder" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                                <option value="">Select Order...</option>
-                                <option value="RO1001" selected>RO1001</option>
-                                <option value="RO1002">RO1002</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="postDate" class="block text-gray-700 font-medium mb-1">POSTING DATE</label>
-                            <input type="date" id="postDate" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        
-                        <div class="md:col-span-1">
-                            <label for="yield" class="block text-gray-700 font-medium mb-1">Enter the Yield (Total Produced)</label>
-                            <input type="number" id="yield" required placeholder="Total Quantity Produced" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="acceptedQty" class="block text-gray-700 font-medium mb-1">Accepted QTY</label>
-                            <input type="number" id="acceptedQty" required placeholder="Quantity passing inspection" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="rejectedQty" class="block text-gray-700 font-medium mb-1">Rejected QTY</label>
-                            <input type="number" id="rejectedQty" required placeholder="Quantity rejected" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        
-                        <div class="md:col-span-3 mt-6 text-right">
-                            <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-check-circle mr-2"></i> Confirm Assembly Order</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            
-            // --- ASSEMBLY QC MODULE (Quality Control) ---
-            const assemblyQCContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Assembly Quality Control (QC) ✅</h1>
-                <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-indigo-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">Inspection Result & Usage Decision (UD)</h2>
-                    <p class="text-gray-500 mb-6">Record inspection details, quantity breakdown, and final usage decision for Assembly outputs.</p>
-
-                    <form id="qcFormAssembly" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Left Column: Inspection Details -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">Inspection Details</h3>
-                            <div><label class="block text-gray-700 font-medium mb-1">Material:</label>
-                                <select id="qcMaterialCodeA" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="MAT001" selected>MAT001 (Assembly)</option>
-                                    <option value="MAT003">MAT003</option>
-                                </select>
-                            </div>
-                            <div><label class="block text-gray-700 font-medium mb-1">Inspection Status:</label>
-                                <select id="inspectionStatusA" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="in_process" selected>In Process</option>
-                                    <option value="pending">Pending</option>
-                                </select>
-                            </div>
-                            <div><label class="block text-gray-700 font-medium mb-1">Inspection Lot:</label>
-                                <select id="inspectionLotA" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="Lot_4567" selected>Lot 4567</option>
-                                    <option value="Lot_4568">Lot 4568</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Middle Column: QTY Breakdown -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Quantity Result</h3>
-                            <div><label for="inspectedQtyA" class="block text-gray-700 font-medium mb-1">Inspected QTY (Total)</label>
-                                <input type="number" id="inspectedQtyA" required placeholder="Total inspected" class="w-full p-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div><label for="okQtyA" class="block text-gray-700 font-medium mb-1">OK QTY (Pass)</label>
-                                <input type="number" id="okQtyA" required placeholder="Quantity passed" value="0" class="w-full p-3 border rounded-lg border-green-400 focus:ring-green-500 focus:border-green-500">
-                            </div>
-                            <div><label for="notOkQtyA" class="block text-gray-700 font-medium mb-1">Not OK QTY (Fail)</label>
-                                <input type="number" id="notOkQtyA" required placeholder="Quantity failed" value="0" class="w-full p-3 border rounded-lg border-red-400 focus:ring-red-500 focus:border-red-500">
-                            </div>
-                        </div>
-
-                        <!-- Right Column: Usage Decision -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Usage Decision (UD)</h3>
-                            <div><label for="defectsCodeA" class="block text-gray-700 font-medium mb-1">Defects Code QTY Wise</label>
-                                <textarea id="defectsCodeA" rows="4" placeholder="e.g., C-101: 5pcs, C-205: 2pcs" class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500"></textarea>
-                            </div>
-                            <div><label for="usageDecisionA" class="block text-gray-700 font-medium mb-1">Usgae Decision</label>
-                                <select id="usageDecisionA" required class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
-                                    <option value="" selected>Select Decision</option>
-                                    <option value="accept">Accept</option>
-                                    <option value="reject">Reject</option>
-                                    <option value="rework">Rework</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="lg:col-span-3 mt-6 text-right">
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-save mr-2"></i> DONE & Save QC</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            
-            // --- PATTERN ORDER MODULE (Order Release + Order Confirmation) ---
-            const patternOrderContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Pattern Order Confirmation 📐</h1>
-                
-                <!-- Order Release Section (Pattern) -->
-                <div class="card bg-white p-6 rounded-xl shadow-xl mb-8 border-l-4 border-amber-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">1. Order Release (Preparation)</h2>
-                    <p class="text-gray-500 mb-4">Manage Created/Released Orders, update Target QTY, and officially Release Orders for the Pattern line.</p>
-                    <button class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md transform hover:scale-[1.01]"><i class="fas fa-list-ol mr-2"></i> View & Release Orders</button>
-                </div>
-
-                <!-- Order Confirmation Section (Pattern) -->
-                <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-sky-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Order Confirmation</h2>
-                    <p class="text-gray-500 mb-6">Enter yield data to confirm the completion of a Pattern Order.</p>
-
-                    <form id="orderConfirmationFormPattern" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 mb-8">
-                        <div class="md:col-span-1">
-                            <label for="materialCodeP" class="block text-gray-700 font-medium mb-1">Select Material Code</label>
-                            <select id="materialCodeP" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                                <option value="">Select Material...</option>
-                                <option value="MAT001" selected>MAT001 - Component A</option>
-                                <option value="MAT002">MAT002 - Component B</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="releaseOrderP" class="block text-gray-700 font-medium mb-1">Select Release Order</label>
-                            <select id="releaseOrderP" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                                <option value="">Select Order...</option>
-                                <option value="RO2001" selected>RO2001</option>
-                                <option value="RO2002">RO2002</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="postDateP" class="block text-gray-700 font-medium mb-1">POSTING DATE</label>
-                            <input type="date" id="postDateP" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        
-                        <div class="md:col-span-1">
-                            <label for="yieldP" class="block text-gray-700 font-medium mb-1">Enter the Yield (Total Produced)</label>
-                            <input type="number" id="yieldP" required placeholder="Total Quantity Produced" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="acceptedQtyP" class="block text-gray-700 font-medium mb-1">Accepted QTY</label>
-                            <input type="number" id="acceptedQtyP" required placeholder="Quantity passing inspection" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label for="rejectedQtyP" class="block text-gray-700 font-medium mb-1">Rejected QTY</label>
-                            <input type="number" id="rejectedQtyP" required placeholder="Quantity rejected" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500">
-                        </div>
-                        
-                        <div class="md:col-span-3 mt-6 text-right">
-                            <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-check-circle mr-2"></i> Confirm Pattern Order</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-
-            // --- PATTERN QC MODULE (Quality Control) ---
-            const patternQCContent = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Pattern Quality Control (QC) ✅</h1>
-                <div class="card bg-white p-6 rounded-xl shadow-xl border-l-4 border-indigo-500">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">Inspection Result & Usage Decision (UD)</h2>
-                    <p class="text-gray-500 mb-6">Record inspection details, quantity breakdown, and final usage decision for Pattern outputs.</p>
-
-                    <form id="qcFormPattern" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Left Column: Inspection Details -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-indigo-700 border-b pb-2 mb-4">Inspection Details</h3>
-                            <div><label class="block text-gray-700 font-medium mb-1">Material:</label>
-                                <select id="qcMaterialCodeP" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="MAT001" selected>MAT001 (Pattern)</option>
-                                    <option value="MAT004">MAT004</option>
-                                </select>
-                            </div>
-                            <div><label class="block text-gray-700 font-medium mb-1">Inspection Status:</label>
-                                <select id="inspectionStatusP" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="in_process" selected>In Process</option>
-                                    <option value="pending">Pending</option>
-                                </select>
-                            </div>
-                            <div><label class="block text-gray-700 font-medium mb-1">Inspection Lot:</label>
-                                <select id="inspectionLotP" class="w-full p-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="Lot_5001" selected>Lot 5001</option>
-                                    <option value="Lot_5002">Lot 5002</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Middle Column: QTY Breakdown -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Quantity Result</h3>
-                            <div><label for="inspectedQtyP" class="block text-gray-700 font-medium mb-1">Inspected QTY (Total)</label>
-                                <input type="number" id="inspectedQtyP" required placeholder="Total inspected" class="w-full p-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div><label for="okQtyP" class="block text-gray-700 font-medium mb-1">OK QTY (Pass)</label>
-                                <input type="number" id="okQtyP" required placeholder="Quantity passed" value="0" class="w-full p-3 border rounded-lg border-green-400 focus:ring-green-500 focus:border-green-500">
-                            </div>
-                            <div><label for="notOkQtyP" class="block text-gray-700 font-medium mb-1">Not OK QTY (Fail)</label>
-                                <input type="number" id="notOkQtyP" required placeholder="Quantity failed" value="0" class="w-full p-3 border rounded-lg border-red-400 focus:ring-red-500 focus:border-red-500">
-                            </div>
-                        </div>
-
-                        <!-- Right Column: Usage Decision -->
-                        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg space-y-4">
-                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 mb-4">Usage Decision (UD)</h3>
-                            <div><label for="defectsCodeP" class="block text-gray-700 font-medium mb-1">Defects Code QTY Wise</label>
-                                <textarea id="defectsCodeP" rows="4" placeholder="e.g., C-101: 5pcs, C-205: 2pcs" class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500"></textarea>
-                            </div>
-                            <div><label for="usageDecisionP" class="block text-gray-700 font-medium mb-1">Usgae Decision</label>
-                                <select id="usageDecisionP" required class="w-full p-3 border rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
-                                    <option value="" selected>Select Decision</option>
-                                    <option value="accept">Accept</option>
-                                    <option value="reject">Reject</option>
-                                    <option value="rework">Rework</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="lg:col-span-3 mt-6 text-right">
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 shadow-lg transform hover:scale-[1.01]"><i class="fas fa-save mr-2"></i> DONE & Save QC</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            moduleContents = {
-                'dashboard': dashboardContent,
-                'production-status': productionStatusContent,
-                'assembly-order': assemblyOrderContent,
-                'assembly-qc': assemblyQCContent,
-                'pattern-order': patternOrderContent,
-                'pattern-qc': patternQCContent,
-            };
-
-
-            // --- EVENT LISTENERS INITIALIZATION ---
 
             // Login Form Submission
             if (loginForm) {
@@ -1262,6 +1312,16 @@
                     }
                 });
             });
+            
+            // Initial load (handles login success)
+            if (!document.getElementById('login-screen').classList.contains('hidden-app')) {
+                 // Check if it's running in the canvas environment and login automatically for testing
+                if (typeof __app_id !== 'undefined') {
+                    handleSuccessfulLogin();
+                }
+            } else {
+                loadModule('dashboard');
+            }
         });
     </script>
 </body>
